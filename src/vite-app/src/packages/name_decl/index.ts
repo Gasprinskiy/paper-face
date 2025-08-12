@@ -24,7 +24,7 @@ const caseMap: Record<RussianCase, string> = {
  * @param targetCase The case to decline to (English keyword).
  * @returns The declined form of the name.
  */
-export async function declineFullName(
+export async function declineWord(
   fullName: string,
   targetCase: RussianCase,
 ): Promise<string> {

@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('fs');
 
+const { PDFDocument } = require('pdf-lib');
+const { error } = require('node:console');
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
@@ -73,20 +76,100 @@ ipcMain.handle('generate-pdf', async (event, { names }) => {
       .replace('{{GROUPNAME}}', groupName);
 
     const pdfWindow = new BrowserWindow({ show: false });
-    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await pdfWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
 
-    const pdfData = await pdfWindow.webContents.printToPDF({
+    let pdfData = await pdfWindow.webContents.printToPDF({
       pageSize: 'A4',
       printBackground: true,
       landscape: true,
       pageRanges: '1',
-      marginsType: 1
+      marginsType: 1,
+      preferCSSPageSize: true
     });
+
+    // ✅ Чистим PDF через pdf-lib
+    const pdfDoc = await PDFDocument.load(pdfData);
+    pdfDoc.setTitle('');
+    pdfDoc.setAuthor('');
+    pdfDoc.setSubject('');
+    pdfDoc.setKeywords([]);
+    pdfDoc.setProducer('');
+    pdfDoc.setCreator('');
+    pdfDoc.setCreationDate(new Date());
+    pdfDoc.setModificationDate(new Date());
+
+    pdfData = await pdfDoc.save()
 
     const fileName = `${name}.pdf`; // Можно добавить дату/время
     const filePath = path.join(saveDir, fileName);
 
     fs.writeFileSync(filePath, pdfData);
     pdfWindow.close();
+  }
+});
+
+ipcMain.handle('generate-pdf-2', async (event, { subjects, names, subjectTypes, groupName }) => {
+  const htmlTemplate = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
+
+  // Выбираем папку для сохранения
+  const { filePaths, canceled } = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    title: 'Выберите папку для PDF'
+  });
+
+  if (canceled || filePaths.length === 0) return;
+
+  const saveDir = filePaths[0];
+
+  try {
+    for (const key of subjectTypes) {
+      const mergedPdf = await PDFDocument.create();
+
+      for (const { name, gender_title } of names) {
+        for (const subject of subjects) {
+          const html = htmlTemplate
+            .replace('{{NAME}}', name)
+            .replace('{{SUBJECT}}', subject)
+            .replace('{{GENDERPOSTFIX}}', gender_title)
+            .replace('{{GROUPNAME}}', groupName)
+
+          const pdfWindow = new BrowserWindow({ show: false });
+          await pdfWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+
+          const tempPdfData = await pdfWindow.webContents.printToPDF({
+            pageSize: 'A4',
+            printBackground: true,
+            landscape: true,
+            pageRanges: '1',
+            marginsType: 1,
+            preferCSSPageSize: true
+          });
+
+          const tempPdf = await PDFDocument.load(tempPdfData);
+          const [tempPage] = await mergedPdf.copyPages(tempPdf, [0])
+          mergedPdf.addPage(tempPage)
+
+          pdfWindow.close();
+        }
+
+        mergedPdf.setTitle('');
+        mergedPdf.setAuthor('');
+        mergedPdf.setSubject('');
+        mergedPdf.setKeywords([]);
+        mergedPdf.setProducer('');
+        mergedPdf.setCreator('');
+        mergedPdf.setCreationDate(new Date());
+        mergedPdf.setModificationDate(new Date());
+
+        const pdfData = await mergedPdf.save()
+
+        const safeName = `${name.replace(/\s+/g, '_')}(${key}).pdf`;
+        const filePath = path.join(saveDir, safeName);
+
+        fs.writeFileSync(filePath, pdfData);
+      }
+    }
+  } catch (e) {
+    console.log('err: ', e)
   }
 });

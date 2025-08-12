@@ -2,19 +2,17 @@
 import { NButton, NCard, NInput, NScrollbar, NSelect } from 'naive-ui';
 import { computed, ref, shallowRef, toRaw } from 'vue';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import { useStorage } from '@vueuse/core';
 
-import { Gender } from '@/shared/types/names';
-import type { NameOption } from '@/shared/types/names';
-import { declineFullName } from '@/packages/name_decl';
+import { declineWord } from '@/packages/name_decl';
 import { deepClone } from '@/packages/object';
+import type { NameOption } from '@/shared/types';
+import { Gender } from '@/shared/types';
+import { useNamesListStorage } from '@/composables/storage';
 
-const nameList = useStorage<NameOption[]>('name_list', [], undefined, {
-  serializer: {
-    read: (v: string) => v ? JSON.parse(v) : [],
-    write: (v: NameOption[]) => JSON.stringify(v),
-  },
-});
+import { ActionNames } from '../../constants';
+import { ActionMode } from '../../types';
+
+const nameList = useNamesListStorage();
 
 const nameVal = shallowRef<string>('');
 const genderVal = shallowRef<Gender>();
@@ -31,7 +29,7 @@ const genderOptions = computed<SelectMixedOption[]>(() => {
 
 async function addName() {
   const trimName = nameVal.value.trim();
-  const nameDeclension = await declineFullName(trimName, 'genitive');
+  const nameDeclension = await declineWord(trimName, 'genitive');
 
   nameList.value = [...nameList.value, {
     name: trimName,
@@ -43,8 +41,12 @@ async function addName() {
 }
 
 async function onRedact(index: number, value: NameOption) {
+  let nameDeclension = value.declension;
+
   const trimName = value.name.trim();
-  const nameDeclension = await declineFullName(value.name, 'genitive');
+  if (trimName !== nameList.value[index].name && value.declension !== nameList.value[index].declension) {
+    nameDeclension = await declineWord(value.name, 'genitive');
+  }
 
   nameList.value[index] = {
     name: trimName,
@@ -65,6 +67,8 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
 
 <template>
   <div class="create-name-view">
+    <h2>{{ ActionNames[ActionMode.NAMES] }}</h2>
+
     <form
       class="create-name-view__form"
       @submit.prevent="addName"
@@ -80,15 +84,19 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
         :options="genderOptions"
       />
 
-      <NButton
-        type="primary"
-        attr-type="submit"
-      >
-        Добавить
-      </NButton>
+      <div class="create-name-view__add-btn">
+        <NButton
+          type="primary"
+          attr-type="submit"
+        >
+          Добавить
+        </NButton>
+      </div>
     </form>
 
-    <NScrollbar style="max-height: 300px;">
+    <NDivider />
+
+    <NScrollbar style="max-height: 400px;">
       <div class="create-name-view__list">
         <NCard
           v-for="(value, index) in list"

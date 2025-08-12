@@ -1,113 +1,135 @@
 <script setup lang="ts">
-import { useStorage } from '@vueuse/core';
-import { NButton, NDropdown, NIcon, NSelect } from 'naive-ui';
+import { NButton, NCheckbox, NCheckboxGroup, NDropdown, NIcon, NSelect, useMessage } from 'naive-ui';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
 import { computed, shallowRef } from 'vue';
 import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
 
-import { Gender } from '@/shared/types/names';
-import type { NameOption } from '@/shared/types/names';
+import { Gender } from '@/shared/types';
+import type { CreateFileNameParam, NameOption, SubjectOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
 
-import { DropDownOptions } from './constants';
-import { ActionMode } from './types';
+import { DropDownOptions, SubjectTypeNames } from './constants';
+import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
+import CreateSubject from './components/create-subject/CreateSubject.vue';
+import { useNamesListStorage, useSubjectsListStorage } from '@/composables/storage';
+import { declineWord } from '@/packages/name_decl';
 
-const nameList = useStorage<NameOption[]>('name_list', [], undefined, {
-  serializer: {
-    read: (v: string) => v ? JSON.parse(v) : [],
-    write: (v: NameOption[]) => JSON.stringify(v),
-  },
-});
-const subjectsList = useStorage<string[]>('subjects_list', [
-  'Родной язык',
-  'Литературное чтение',
-  'Математика',
-  'Окружающий мир',
-  'Иностранный язык',
-  'Физическая культура',
-  'Изобразительное искусство',
-  'Музыка',
-  'Технология',
-  'Основы религиозных культур и светской этики',
-], undefined, {
-  serializer: {
-    read: (v: string) => v ? JSON.parse(v) : [],
-    write: (v: string[]) => JSON.stringify(v),
-  },
-});
+const message = useMessage();
+const nameList = useNamesListStorage();
+const subjectsList = useSubjectsListStorage();
 const { showModal } = useModal();
 
-const nameValue = shallowRef<string[]>(['all']);
-const subjectValue = shallowRef<string[]>(['all']);
+const nameValue = shallowRef<string[]>([]);
+const subjectValue = shallowRef<string[]>([]);
+const subjectTypeValue = shallowRef<SubjectType[]>([SubjectType.DEFAULT]);
 
 const nameListOptions = computed<SelectMixedOption[]>(() => {
-  const mapedList = nameList.value.map(({ name }) => {
+  return nameList.value.map(({ name }) => {
     return {
       label: name,
       value: name,
     };
   });
-
-  return [
-    {
-      label: 'Все',
-      value: 'all',
-      default: true,
-      disabled: nameValue.value.length > 1,
-    },
-    ...mapedList,
-  ];
 });
 
 const subjectListOptions = computed<SelectMixedOption[]>(() => {
-  const mapedList = subjectsList.value.map((name) => {
+  return subjectsList.value.map(({ name }) => {
     return {
       label: name,
       value: name,
     };
   });
-
-  return [
-    {
-      label: 'Все',
-      value: 'all',
-      default: true,
-      disabled: subjectValue.value.length > 1,
-    },
-    ...mapedList,
-  ];
 });
 
-function onUpdateNames() {
-  // nameValue.value = nameValue.value.filter(item => item !== 'all');
+function onSubjectTypeUpdate(value: any[]) {
+  if (value.length > 0) {
+    return;
+  }
+
+  subjectTypeValue.value = [SubjectType.DEFAULT];
 }
 
-function onSubmitCreate() {
+async function onSubmitCreate() {
   // let names = nameValue.value;
-  if (nameValue.value.length > 1) {
-    // names = nameValue.value.filter(item => item !== 'all');
-  }
-
-  const windowEAPI = window as WindowWithElectronApi;
-
-  const shit = [];
-  const className = '3 E';
-  for (const element of nameList.value) {
-    const genTitle = element.gender === Gender.MALE ? 'ка' : 'цы';
-
-    shit.push({
-      subject: subjectsList.value[0],
-      genderTitle: genTitle,
-      groupName: className,
-      name: element.declension,
+  if (nameList.value.length === 0) {
+    message.error('Список учеников пуст', {
+      duration: 3000,
     });
+    return;
   }
 
-  windowEAPI.electronAPI?.generatePDFs(shit);
+  if (subjectsList.value.length === 0) {
+    message.error('Список предметов пуст', {
+      duration: 3000,
+    });
+    return;
+  }
+
+  let pickedNames: CreateFileNameParam[] = nameList.value.map(({ declension, gender }) => {
+    return {
+      gender_title: gender === Gender.MALE ? 'ка' : 'цы',
+      name: declension,
+    };
+  });
+  let pickedSubjects: string[] = subjectsList.value.map(({ declension }) => declension);
+
+  if (nameValue.value.length > 0) {
+    const listMap = nameList.value.reduce((acc, cur) => {
+      if (!acc.has(cur.name)) {
+        acc.set(cur.name, cur);
+      }
+
+      return acc;
+    }, new Map<string, NameOption>());
+
+    pickedNames = nameValue.value.map(name => listMap.get(name)!).map(({ declension, gender }) => {
+      return {
+        gender_title: gender === Gender.MALE ? 'ка' : 'цы',
+        name: declension,
+      };
+    }); ;
+  }
+
+  if (subjectValue.value.length > 0) {
+    const listMap = subjectsList.value.reduce((acc, cur) => {
+      if (!acc.has(cur.name)) {
+        acc.set(cur.name, cur);
+      }
+
+      return acc;
+    }, new Map<string, SubjectOption>());
+
+    pickedSubjects = nameValue.value.map(name => listMap.get(name)!).map(({ declension }) => declension); ;
+  }
+
+  let subjectTypes: string[] = [];
+
+  for (const element of subjectTypeValue.value) {
+    const result = await declineWord(SubjectTypeNames[element], 'genitive');
+    subjectTypes = [...subjectTypes, result.toLowerCase()];
+  }
+
+  const infoMessage = message.loading('Идет создание файлов, это может занять какое-то время');
+
+  try {
+    const windowEAPI = window as WindowWithElectronApi;
+    windowEAPI.electronAPI?.generatePDFs({
+      subjects: pickedSubjects,
+      names: pickedNames,
+      subjectTypes,
+      groupName: '3 Е',
+    });
+
+    infoMessage.destroy();
+    message.success('Файлы сгенерированы');
+  } catch {
+    infoMessage.destroy();
+    message.error('Не удалось создать файлы');
+  }
 }
 
 function onRedactModeSelect(val: ActionMode) {
@@ -117,7 +139,7 @@ function onRedactModeSelect(val: ActionMode) {
     },
 
     [ActionMode.SUBJECTS]: () => {
-      return CreateName;
+      return CreateSubject;
     },
   };
 
@@ -126,6 +148,12 @@ function onRedactModeSelect(val: ActionMode) {
   showModal({
     component,
   });
+}
+
+function onReset() {
+  nameValue.value = [];
+  subjectValue.value = [];
+  subjectTypeValue.value = [SubjectType.DEFAULT];
 }
 </script>
 
@@ -158,7 +186,7 @@ function onRedactModeSelect(val: ActionMode) {
           v-model:value="nameValue"
           multiple
           :options="nameListOptions"
-          @update-value="onUpdateNames"
+          placeholder="По умолчанию выбраны все"
         />
       </div>
 
@@ -168,15 +196,41 @@ function onRedactModeSelect(val: ActionMode) {
           v-model:value="subjectValue"
           multiple
           :options="subjectListOptions"
+          placeholder="По умолчанию выбраны все"
         />
       </div>
 
-      <NButton
-        type="primary"
-        attr-type="submit"
-      >
-        Создать
-      </NButton>
+      <div class="main-view__checboxes">
+        <NCheckboxGroup
+          v-model:value="subjectTypeValue"
+          @update:value="onSubjectTypeUpdate"
+        >
+          <NCheckbox
+            :value="SubjectType.DEFAULT"
+            :label="SubjectTypeNames[SubjectType.DEFAULT]"
+          />
+          <NCheckbox
+            :value="SubjectType.TEST"
+            :label="SubjectTypeNames[SubjectType.DEFAULT]"
+          />
+        </NCheckboxGroup>
+      </div>
+
+      <div class="main-view__action-btns">
+        <NButton
+          type="warning"
+          @click="onReset"
+        >
+          Сбросить
+        </NButton>
+
+        <NButton
+          type="primary"
+          attr-type="submit"
+        >
+          Создать
+        </NButton>
+      </div>
     </form>
   </div>
 </template>

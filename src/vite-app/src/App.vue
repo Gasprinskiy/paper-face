@@ -3,17 +3,12 @@ import { NConfigProvider, NGlobalStyle, NMessageProvider, NModalProvider } from 
 
 import Main from './components/main-view/Main.vue';
 import ModalProvider from './components/modal-provider/ModalProvider.vue';
-import { onBeforeMount } from 'vue';
-
-onBeforeMount(() => {
-  localStorage.clear();
-});
 </script>
 
 <template>
   <NConfigProvider>
     <NModalProvider>
-      <NMessageProvider>
+      <NMessageProvider placement="bottom">
         <ModalProvider />
         <NGlobalStyle />
         <Main />
