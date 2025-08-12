@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 297mm;
+      height: 210mm;
+      display: flex;
+      justify-content: right;
+      margin: 0;
+      padding: 0;
+    }
+
+    .content {
+      width: 170mm;
+      height: 210mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bage {
+      padding: 10px;
+      border: 1px solid black;
+      font-size: 18px;
+      border-radius: 3px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .bage h2 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="content">
+    <div class="bage">
+      <h2>Тетрадь</h2>
+      <p>для предмета {{SUBJECT}}</p>
+      <p>учени{{GENDERPOSTFIX}} {{GROUPNAME}} класса</p>
+      <p>{{NAME}}</p>
+    </div>
+  </div>
+</body>
+
+</html>

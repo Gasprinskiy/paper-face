@@ -1,0 +1,29 @@
+.create-name-view {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+
+  &__form {
+    display: flex;
+    gap: 5px;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__redact-btn {
+    width: 100%;
+    display: flex;
+    justify-content: right;
+    gap: 5px;
+  }
+}
