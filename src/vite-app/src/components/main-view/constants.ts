@@ -8,7 +8,7 @@ export const ActionNames: Record<ActionMode, string> = {
 
 export const SubjectTypeNames: Record<SubjectType, string> = {
   [SubjectType.TEST]: 'Контрольная работа',
-  [SubjectType.DEFAULT]: 'Классная работа"',
+  [SubjectType.DEFAULT]: 'Классная работа',
 };
 
 export const DropDownOptions: DropdownMixedOption[] = [

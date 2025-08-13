@@ -28,12 +28,8 @@ async function addName() {
 }
 
 async function onRedact(index: number, value: SubjectOption) {
-  let nameDeclension = value.declension;
-
   const trimName = value.name.trim();
-  if (trimName !== subjectsList.value[index].name && value.declension !== subjectsList.value[index].declension) {
-    nameDeclension = await declineWord(value.name, 'genitive');
-  }
+  const nameDeclension = await declineWord(value.name, 'genitive');
 
   subjectsList.value[index] = {
     name: trimName,

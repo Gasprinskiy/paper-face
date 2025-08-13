@@ -45,6 +45,7 @@
       display: flex;
       flex-direction: column;
       gap: 5px;
+      max-width: 400px;
     }
 
     .bage h2 {
@@ -58,7 +59,7 @@
   <div class="content">
     <div class="bage">
       <h2>Тетрадь</h2>
-      <p>для работ по {{SUBJECT}}</p>
+      <p>для {{SUBJECTTYPE}} по {{SUBJECT}}</p>
       <p>учени{{GENDERPOSTFIX}} {{GROUPNAME}} класса</p>
       <p>{{NAME}}</p>
     </div>

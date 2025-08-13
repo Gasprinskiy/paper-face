@@ -1,7 +1,11 @@
 <script setup lang="ts">
+// @ts-expect-error freakint description
+import AppEventBus from '../../../../event-bus/index.js';
+
 import { NButton, NCheckbox, NCheckboxGroup, NDropdown, NIcon, NSelect, useMessage } from 'naive-ui';
+import type { MessageReactive } from 'naive-ui';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import { computed, shallowRef } from 'vue';
+import { computed, onMounted, shallowRef } from 'vue';
 import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
@@ -16,7 +20,7 @@ import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
 import { useNamesListStorage, useSubjectsListStorage } from '@/composables/storage';
-import { declineWord } from '@/packages/name_decl';
+import { declineWord, pluralize } from '@/packages/name_decl';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
@@ -69,10 +73,11 @@ async function onSubmitCreate() {
     return;
   }
 
-  let pickedNames: CreateFileNameParam[] = nameList.value.map(({ declension, gender }) => {
+  let pickedNames: CreateFileNameParam[] = nameList.value.map(({ name, declension, gender }) => {
     return {
       gender_title: gender === Gender.MALE ? 'ка' : 'цы',
-      name: declension,
+      name,
+      declension,
     };
   });
   let pickedSubjects: string[] = subjectsList.value.map(({ declension }) => declension);
@@ -86,10 +91,11 @@ async function onSubmitCreate() {
       return acc;
     }, new Map<string, NameOption>());
 
-    pickedNames = nameValue.value.map(name => listMap.get(name)!).map(({ declension, gender }) => {
+    pickedNames = nameValue.value.map(name => listMap.get(name)!).map(({ name, declension, gender }) => {
       return {
         gender_title: gender === Gender.MALE ? 'ка' : 'цы',
-        name: declension,
+        name,
+        declension,
       };
     }); ;
   }
@@ -106,29 +112,23 @@ async function onSubmitCreate() {
     pickedSubjects = nameValue.value.map(name => listMap.get(name)!).map(({ declension }) => declension); ;
   }
 
-  let subjectTypes: string[] = [];
-
-  for (const element of subjectTypeValue.value) {
-    const result = await declineWord(SubjectTypeNames[element], 'genitive');
-    subjectTypes = [...subjectTypes, result.toLowerCase()];
-  }
-
-  const infoMessage = message.loading('Идет создание файлов, это может занять какое-то время');
-
   try {
     const windowEAPI = window as WindowWithElectronApi;
+    let subjectTypes: string[] = [];
+
+    for (const element of subjectTypeValue.value) {
+      const result = await declineWord(SubjectTypeNames[element], 'genitive', true);
+      subjectTypes = [...subjectTypes, result.toLowerCase()];
+    }
+
     windowEAPI.electronAPI?.generatePDFs({
       subjects: pickedSubjects,
       names: pickedNames,
       subjectTypes,
       groupName: '3 Е',
     });
-
-    infoMessage.destroy();
-    message.success('Файлы сгенерированы');
-  } catch {
-    infoMessage.destroy();
-    message.error('Не удалось создать файлы');
+  } catch (e) {
+    console.error(e);
   }
 }
 
@@ -155,6 +155,34 @@ function onReset() {
   subjectValue.value = [];
   subjectTypeValue.value = [SubjectType.DEFAULT];
 }
+
+onMounted(() => {
+  let loadingMessage: MessageReactive | null = null;
+
+  AppEventBus?.subscribe({
+    key: 'on_start',
+    callBack: () => {
+      loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время');
+    },
+  });
+
+  AppEventBus?.subscribe({
+    key: 'on_done',
+    callBack: (count: number) => {
+      loadingMessage?.destroy();
+      const countPlur = pluralize(count, 'файл', 'файла', 'файлов');
+      message.success(`Создано ${count} ${countPlur}`);
+    },
+  });
+
+  AppEventBus?.subscribe({
+    key: 'on_error',
+    callBack: () => {
+      loadingMessage?.destroy();
+      message.success(`Произошла ошибка при создании файлов`);
+    },
+  });
+});
 </script>
 
 <template>

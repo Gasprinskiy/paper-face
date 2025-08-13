@@ -4,7 +4,7 @@ set -e
 
 npm run build
 
-cp -r ./dist/* ./morfer
+cp -r ./morfer ./dist/
 
 INDEX_FILE="dist/index.html"
 

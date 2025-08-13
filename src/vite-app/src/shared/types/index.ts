@@ -17,4 +17,5 @@ export interface SubjectOption {
 export interface CreateFileNameParam {
   gender_title: string;
   name: string;
+  declension: string;
 }

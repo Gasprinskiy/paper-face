@@ -3,7 +3,8 @@ const path = require('node:path');
 const fs = require('fs');
 
 const { PDFDocument } = require('pdf-lib');
-const { error } = require('node:console');
+const AppEventBus = require('./event-bus/index.js').default;
+
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -108,9 +109,13 @@ ipcMain.handle('generate-pdf', async (event, { names }) => {
   }
 });
 
-ipcMain.handle('generate-pdf-2', async (event, { subjects, names, subjectTypes, groupName }) => {
+ipcMain.handle('generate-pdf-2', async (event, {
+  subjects,
+  names,
+  subjectTypes,
+  groupName,
+}) => {
   const htmlTemplate = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
-
   // Выбираем папку для сохранения
   const { filePaths, canceled } = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -121,55 +126,79 @@ ipcMain.handle('generate-pdf-2', async (event, { subjects, names, subjectTypes, 
 
   const saveDir = filePaths[0];
 
-  try {
-    for (const key of subjectTypes) {
-      const mergedPdf = await PDFDocument.create();
-
-      for (const { name, gender_title } of names) {
-        for (const subject of subjects) {
-          const html = htmlTemplate
-            .replace('{{NAME}}', name)
-            .replace('{{SUBJECT}}', subject)
-            .replace('{{GENDERPOSTFIX}}', gender_title)
-            .replace('{{GROUPNAME}}', groupName)
-
-          const pdfWindow = new BrowserWindow({ show: false });
-          await pdfWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
-
-          const tempPdfData = await pdfWindow.webContents.printToPDF({
-            pageSize: 'A4',
-            printBackground: true,
-            landscape: true,
-            pageRanges: '1',
-            marginsType: 1,
-            preferCSSPageSize: true
-          });
-
-          const tempPdf = await PDFDocument.load(tempPdfData);
-          const [tempPage] = await mergedPdf.copyPages(tempPdf, [0])
-          mergedPdf.addPage(tempPage)
-
-          pdfWindow.close();
-        }
-
-        mergedPdf.setTitle('');
-        mergedPdf.setAuthor('');
-        mergedPdf.setSubject('');
-        mergedPdf.setKeywords([]);
-        mergedPdf.setProducer('');
-        mergedPdf.setCreator('');
-        mergedPdf.setCreationDate(new Date());
-        mergedPdf.setModificationDate(new Date());
-
-        const pdfData = await mergedPdf.save()
-
-        const safeName = `${name.replace(/\s+/g, '_')}(${key}).pdf`;
-        const filePath = path.join(saveDir, safeName);
-
-        fs.writeFileSync(filePath, pdfData);
-      }
+  const grouped = {};
+  for (const person of names) {
+    for (const type of subjectTypes) {
+      const key = `${person.name.replace(/\s+/g, '_')}|${type}`;
+      grouped[key] = {
+        name: person.declension,
+        genderTitle: person.gender_title,
+        personSubjects: subjects
+      };
     }
+  }
+
+
+  try {
+    AppEventBus.dispatch({
+      key: 'on_start'
+    })
+
+    let count = 0
+    for (const [key, { name, genderTitle, personSubjects }] of Object.entries(grouped)) {
+      count += 1
+      const mergedPdf = await PDFDocument.create();
+      const subjectType = key.split('|')[1]
+
+      for (const subject of personSubjects) {
+        const html = htmlTemplate
+          .replace('{{SUBJECTTYPE}}', subjectType)
+          .replace('{{NAME}}', name)
+          .replace('{{SUBJECT}}', subject)
+          .replace('{{GENDERPOSTFIX}}', genderTitle)
+          .replace('{{GROUPNAME}}', groupName);
+
+        const pdfWindow = new BrowserWindow({ show: false });
+        await pdfWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+
+        const pdfData = await pdfWindow.webContents.printToPDF({
+          pageSize: 'A4',
+          printBackground: true,
+          landscape: true,
+          pageRanges: '1',
+          marginsType: 1,
+          preferCSSPageSize: true
+        });
+
+        const tempPdf = await PDFDocument.load(pdfData);
+        const copiedPages = await mergedPdf.copyPages(tempPdf, tempPdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+
+        pdfWindow.close();
+      }
+
+      // Очищаем метаданные у итогового файла
+      mergedPdf.setTitle('');
+      mergedPdf.setAuthor('');
+      mergedPdf.setSubject('');
+      mergedPdf.setKeywords([]);
+      mergedPdf.setProducer('');
+      mergedPdf.setCreator('');
+      mergedPdf.setCreationDate(new Date());
+      mergedPdf.setModificationDate(new Date());
+
+      const finalPdfData = await mergedPdf.save();
+      fs.writeFileSync(path.join(saveDir, `${key}.pdf`), finalPdfData);
+    }
+
+    AppEventBus.dispatch({
+      key: 'on_done',
+      arg: count
+    })
   } catch (e) {
     console.log('err: ', e)
+    AppEventBus.dispatch({
+      key: 'on_start'
+    })
   }
 });
