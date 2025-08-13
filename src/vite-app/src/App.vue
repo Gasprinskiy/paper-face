@@ -8,7 +8,7 @@ import ModalProvider from './components/modal-provider/ModalProvider.vue';
 <template>
   <NConfigProvider>
     <NModalProvider>
-      <NMessageProvider placement="bottom">
+      <NMessageProvider placement="bottom" :duration="3000">
         <ModalProvider />
         <NGlobalStyle />
         <Main />

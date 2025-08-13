@@ -1,7 +1,7 @@
 {
   "name": "paper-face",
   "productName": "paper-face",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
@@ -13,11 +13,10 @@
     "build:win": "electron-builder --win"
   },
   "build": {
-    "appId": "com..myapp",
+    "appId": "com.papaer-face.myapp",
     "productName": "Paper Face",
     "win": {
-      "target": "portable",
-      "icon": "build/icon.ico"
+      "target": "portable"
     }
   },
   "keywords": [],

@@ -7,12 +7,11 @@ import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
 
-import { Gender } from '@/shared/types';
-import type { CreateFileNameParam, NameOption, SubjectOption } from '@/shared/types';
+import type { CommonOption, CreateFileNameParam, NameOption, SubjectOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
 
-import { DropDownOptions, SubjectTypeNames } from './constants';
+import { DropDownOptions, GenderPostfixByKey, SubjectTypeNames } from './constants';
 import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
@@ -29,19 +28,19 @@ const subjectValue = shallowRef<string[]>([]);
 const subjectTypeValue = shallowRef<SubjectType[]>([SubjectType.DEFAULT]);
 
 const nameListOptions = computed<SelectMixedOption[]>(() => {
-  return nameList.value.map(({ name }) => {
+  return nameList.value.map(({ id, name }) => {
     return {
       label: name,
-      value: name,
+      value: id,
     };
   });
 });
 
 const subjectListOptions = computed<SelectMixedOption[]>(() => {
-  return subjectsList.value.map(({ name }) => {
+  return subjectsList.value.map(({ id, name }) => {
     return {
       label: name,
-      value: name,
+      value: id,
     };
   });
 });
@@ -72,7 +71,7 @@ async function onSubmitCreate() {
 
   let pickedNames: CreateFileNameParam[] = nameList.value.map(({ name, declension, gender }) => {
     return {
-      gender_title: gender === Gender.MALE ? 'ка' : 'цы',
+      gender_title: GenderPostfixByKey[gender],
       name,
       declension,
     };
@@ -81,16 +80,16 @@ async function onSubmitCreate() {
 
   if (nameValue.value.length > 0) {
     const listMap = nameList.value.reduce((acc, cur) => {
-      if (!acc.has(cur.name)) {
-        acc.set(cur.name, cur);
+      if (!acc.has(cur.id)) {
+        acc.set(cur.id, cur);
       }
 
       return acc;
     }, new Map<string, NameOption>());
 
-    pickedNames = nameValue.value.map(name => listMap.get(name)!).map(({ name, declension, gender }) => {
+    pickedNames = nameValue.value.map(id => listMap.get(id)!).map(({ name, declension, gender }) => {
       return {
-        gender_title: gender === Gender.MALE ? 'ка' : 'цы',
+        gender_title: GenderPostfixByKey[gender],
         name,
         declension,
       };
@@ -99,25 +98,25 @@ async function onSubmitCreate() {
 
   if (subjectValue.value.length > 0) {
     const listMap = toRaw(subjectsList.value).reduce((acc, cur) => {
-      if (!acc.has(cur.name)) {
-        acc.set(cur.name, cur);
+      if (!acc.has(cur.id)) {
+        acc.set(cur.id, cur);
       }
 
       return acc;
     }, new Map<string, SubjectOption>());
 
-    pickedSubjects = subjectValue.value.map(name => listMap.get(name)!).map(({ declension }) => declension);
+    pickedSubjects = subjectValue.value.map(id => listMap.get(id)!).map(({ declension }) => declension);
   }
 
   try {
     const windowEAPI = window as WindowWithElectronApi;
-    let subjectTypes: SubjectOption[] = [];
+    let subjectTypes: CommonOption[] = [];
 
     for (const element of subjectTypeValue.value) {
       const result = await declineWord(SubjectTypeNames[element], 'genitive', true);
       subjectTypes = [...subjectTypes, {
         name: SubjectTypeNames[element],
-        declension: result,
+        declension: result.toLowerCase(),
       }];
     }
 
@@ -162,7 +161,9 @@ onMounted(() => {
   const windowEAPI = window as WindowWithElectronApi;
 
   windowEAPI.electronAPI?.on('start', () => {
-    loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время');
+    loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время', {
+      duration: 0,
+    });
   });
 
   windowEAPI.electronAPI?.on('done', (count: number) => {
@@ -173,7 +174,7 @@ onMounted(() => {
 
   windowEAPI.electronAPI?.on('error', () => {
     loadingMessage?.destroy();
-    message.success(`Произошла ошибка при создании файлов`);
+    message.error(`Произошла ошибка при создании файлов`);
   });
 });
 </script>

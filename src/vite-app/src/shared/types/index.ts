@@ -1,21 +1,23 @@
 export enum Gender {
-  MALE = 'муж.',
-  FEMALE = 'жен.',
+  MALE = 'male',
+  FEMALE = 'female',
 }
 
-export interface NameOption {
+export interface CommonOption {
   name: string;
   declension: string;
+}
+
+export interface CommonOptionWithID extends CommonOption {
+  id: string;
+}
+
+export interface NameOption extends CommonOptionWithID {
   gender: Gender;
 }
 
-export interface SubjectOption {
-  name: string;
-  declension: string;
-}
+export type SubjectOption = CommonOptionWithID;
 
-export interface CreateFileNameParam {
+export interface CreateFileNameParam extends CommonOption {
   gender_title: string;
-  name: string;
-  declension: string;
 }

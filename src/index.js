@@ -25,8 +25,12 @@ const createWindow = () => {
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'vite-app/dist', './index.html'));
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  mainWindow.setMenu(null);
+
+  // if (Boolean(process.env)) {
+  // return
+  // }
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
@@ -126,16 +130,15 @@ ipcMain.handle('generate-pdf-2', async (event, {
   if (canceled || filePaths.length === 0) return;
 
   const saveDir = filePaths[0];
-
   const grouped = {};
   for (const person of names) {
-    for (const subject of subjectTypes) {
-      const key = `${person.name.replace(/\s+/g, '_')}|${subject.name}`;
+    for (const subjectType of subjectTypes) {
+      const key = `${person.name.replace(/\s+/g, '_')}|${subjectType.name}`;
       grouped[key] = {
         name: person.declension,
         genderTitle: person.gender_title,
         personSubjects: subjects,
-        type: subject.declension
+        type: subjectType.declension
       };
     }
   }
@@ -171,6 +174,16 @@ ipcMain.handle('generate-pdf-2', async (event, {
         });
 
         const tempPdf = await PDFDocument.load(pdfData);
+
+        tempPdf.setTitle('');
+        tempPdf.setAuthor('');
+        tempPdf.setSubject('');
+        tempPdf.setKeywords([]);
+        tempPdf.setProducer('');
+        tempPdf.setCreator('');
+        tempPdf.setCreationDate(new Date());
+        tempPdf.setModificationDate(new Date());
+
         const copiedPages = await mergedPdf.copyPages(tempPdf, tempPdf.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
 

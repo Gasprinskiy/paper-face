@@ -1,6 +1,9 @@
 <script lang="ts" setup>
-import { NButton, NCard, NInput, NScrollbar, NSelect } from 'naive-ui';
-import { computed, ref, shallowRef, toRaw } from 'vue';
+import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, useMessage } from 'naive-ui';
+import { ref, shallowRef, toRaw } from 'vue';
+import { SaveOutline, TrashBinOutline } from '@vicons/ionicons5';
+import { required } from '@vuelidate/validators';
+import useVuelidate from '@vuelidate/core';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
 
 import { declineWord } from '@/packages/name_decl';
@@ -11,33 +14,60 @@ import { useNamesListStorage } from '@/composables/storage';
 
 import { ActionNames } from '../../constants';
 import { ActionMode } from '../../types';
+import { GenderNameByKey } from './constants';
 
+const message = useMessage();
 const nameList = useNamesListStorage();
 
 const nameVal = shallowRef<string>('');
-const genderVal = shallowRef<Gender>();
+const genderVal = shallowRef<Gender | null>(null);
 const list = ref<NameOption[]>(deepClone(toRaw(nameList.value)));
 
-const genderOptions = computed<SelectMixedOption[]>(() => {
-  return Object.keys(Gender).map((key: string): SelectMixedOption => {
-    return {
-      value: key,
-      label: Gender[key as keyof typeof Gender],
-    };
-  });
+const validatos = {
+  name: { required },
+  gender: { required },
+};
+
+const v$ = useVuelidate(validatos, {
+  name: nameVal,
+  gender: genderVal,
 });
 
-async function addName() {
+const genderOptions: SelectMixedOption[] = [
+  {
+    value: Gender.MALE,
+    label: GenderNameByKey[Gender.MALE],
+  },
+  {
+    value: Gender.FEMALE,
+    label: GenderNameByKey[Gender.FEMALE],
+  },
+];
+
+async function onCreate() {
+  const valid = await v$.value.$validate();
+  if (!valid) {
+    message.error('Поля пустые или не до конца заполнены');
+    return;
+  }
+
+  const uuid = crypto.randomUUID();
   const trimName = nameVal.value.trim();
   const nameDeclension = await declineWord(trimName, 'genitive');
 
   nameList.value = [...nameList.value, {
+    id: uuid,
     name: trimName,
     declension: nameDeclension,
     gender: genderVal.value || Gender.MALE,
   }];
 
   list.value = nameList.value;
+
+  nameVal.value = '';
+  genderVal.value = null;
+
+  message.success('Ученик добавлен');
 }
 
 async function onRedact(index: number, value: NameOption) {
@@ -45,12 +75,15 @@ async function onRedact(index: number, value: NameOption) {
   const nameDeclension = await declineWord(value.name, 'genitive');
 
   nameList.value[index] = {
+    id: value.id,
     name: trimName,
     declension: nameDeclension,
     gender: value.gender,
   };
 
   list.value[index] = nameList.value[index];
+
+  message.success('Изменения сохранены');
 }
 
 function onRemove(removeIndex: number, removeValue: NameOption) {
@@ -58,6 +91,8 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
 
   nameList.value = filtered;
   list.value = filtered;
+
+  message.warning('Ученик удален');
 }
 </script>
 
@@ -67,7 +102,7 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
 
     <form
       class="create-name-view__form"
-      @submit.prevent="addName"
+      @submit.prevent="onCreate"
     >
       <NInput
         v-model:value="nameVal"
@@ -92,58 +127,66 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
 
     <NDivider />
 
-    <NScrollbar style="max-height: 400px;">
-      <div class="create-name-view__list">
-        <NCard
+    <NScrollbar style="max-height: 226px;">
+      <NTable :single-line="false">
+        <thead>
+          <tr>
+            <th>Фамилия и Имя</th>
+            <th>Сколнение</th>
+            <th>Пол</th>
+            <th />
+          </tr>
+        </thead>
+
+        <tbody
           v-for="(value, index) in list"
-          :key="index"
+          :key="value.id"
         >
-          <form
-            class="create-name-view__form"
-            @submit.prevent="onRedact(index, value)"
-          >
-            <div class="app-input">
-              <span>Фамилия и Имя</span>
-              <NInput
-                v-model:value="value.name"
-                placeholder="Фамилия и Имя"
-              />
-            </div>
+          <td>
+            <NInput
+              v-model:value="value.name"
+              placeholder="Фамилия и Имя"
+            />
+          </td>
 
-            <div class="app-input">
-              <span>Сколнение</span>
-              <NInput
-                v-model:value="value.declension"
-                placeholder="Фамилия и Имя"
-              />
-            </div>
+          <td>
+            <NInput
+              v-model:value="value.declension"
+              placeholder="Сколнение"
+              disabled
+            />
+          </td>
 
-            <div class="app-input">
-              <span>Пол</span>
-              <NSelect
-                v-model:value="value.gender"
-                placeholder="Пол"
-                :options="genderOptions"
-              />
-            </div>
+          <td>
+            <NSelect
+              v-model:value="value.gender"
+              placeholder="Пол"
+              :options="genderOptions"
+            />
+          </td>
 
+          <td class="create-name-view__redact">
             <div class="create-name-view__redact-btn">
               <NButton
                 type="error"
                 @click="onRemove(index, value)"
               >
-                Удалить
+                <template #icon>
+                  <NIcon :component="TrashBinOutline" />
+                </template>
               </NButton>
               <NButton
                 type="primary"
-                attr-type="submit"
+                @click="onRedact(index, value)"
               >
-                Сохранить
+                <template #icon>
+                  <NIcon :component="SaveOutline" />
+                </template>
               </NButton>
             </div>
-          </form>
-        </NCard>
-      </div>
+          </td>
+        </tbody>
+      </NTable>
     </NScrollbar>
   </div>
 </template>
