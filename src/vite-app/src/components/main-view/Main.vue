@@ -1,11 +1,8 @@
 <script setup lang="ts">
-// @ts-expect-error freakint description
-import AppEventBus from '../../../../event-bus/index.js';
-
 import { NButton, NCheckbox, NCheckboxGroup, NDropdown, NIcon, NSelect, useMessage } from 'naive-ui';
 import type { MessageReactive } from 'naive-ui';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import { computed, onMounted, shallowRef } from 'vue';
+import { computed, onMounted, shallowRef, toRaw } from 'vue';
 import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
@@ -101,7 +98,7 @@ async function onSubmitCreate() {
   }
 
   if (subjectValue.value.length > 0) {
-    const listMap = subjectsList.value.reduce((acc, cur) => {
+    const listMap = toRaw(subjectsList.value).reduce((acc, cur) => {
       if (!acc.has(cur.name)) {
         acc.set(cur.name, cur);
       }
@@ -109,16 +106,19 @@ async function onSubmitCreate() {
       return acc;
     }, new Map<string, SubjectOption>());
 
-    pickedSubjects = nameValue.value.map(name => listMap.get(name)!).map(({ declension }) => declension); ;
+    pickedSubjects = subjectValue.value.map(name => listMap.get(name)!).map(({ declension }) => declension);
   }
 
   try {
     const windowEAPI = window as WindowWithElectronApi;
-    let subjectTypes: string[] = [];
+    let subjectTypes: SubjectOption[] = [];
 
     for (const element of subjectTypeValue.value) {
       const result = await declineWord(SubjectTypeNames[element], 'genitive', true);
-      subjectTypes = [...subjectTypes, result.toLowerCase()];
+      subjectTypes = [...subjectTypes, {
+        name: SubjectTypeNames[element],
+        declension: result,
+      }];
     }
 
     windowEAPI.electronAPI?.generatePDFs({
@@ -159,28 +159,21 @@ function onReset() {
 onMounted(() => {
   let loadingMessage: MessageReactive | null = null;
 
-  AppEventBus?.subscribe({
-    key: 'on_start',
-    callBack: () => {
-      loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время');
-    },
+  const windowEAPI = window as WindowWithElectronApi;
+
+  windowEAPI.electronAPI?.on('start', () => {
+    loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время');
   });
 
-  AppEventBus?.subscribe({
-    key: 'on_done',
-    callBack: (count: number) => {
-      loadingMessage?.destroy();
-      const countPlur = pluralize(count, 'файл', 'файла', 'файлов');
-      message.success(`Создано ${count} ${countPlur}`);
-    },
+  windowEAPI.electronAPI?.on('done', (count: number) => {
+    loadingMessage?.destroy();
+    const countPlur = pluralize(count, 'файл', 'файла', 'файлов');
+    message.success(`Создано ${count} ${countPlur}`);
   });
 
-  AppEventBus?.subscribe({
-    key: 'on_error',
-    callBack: () => {
-      loadingMessage?.destroy();
-      message.success(`Произошла ошибка при создании файлов`);
-    },
+  windowEAPI.electronAPI?.on('error', () => {
+    loadingMessage?.destroy();
+    message.success(`Произошла ошибка при создании файлов`);
   });
 });
 </script>

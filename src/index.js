@@ -3,7 +3,6 @@ const path = require('node:path');
 const fs = require('fs');
 
 const { PDFDocument } = require('pdf-lib');
-const AppEventBus = require('./event-bus/index.js').default;
 
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -11,9 +10,11 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+let mainWindow;
+
 const createWindow = () => {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
@@ -128,31 +129,30 @@ ipcMain.handle('generate-pdf-2', async (event, {
 
   const grouped = {};
   for (const person of names) {
-    for (const type of subjectTypes) {
-      const key = `${person.name.replace(/\s+/g, '_')}|${type}`;
+    for (const subject of subjectTypes) {
+      const key = `${person.name.replace(/\s+/g, '_')}|${subject.name}`;
       grouped[key] = {
         name: person.declension,
         genderTitle: person.gender_title,
-        personSubjects: subjects
+        personSubjects: subjects,
+        type: subject.declension
       };
     }
   }
 
 
   try {
-    AppEventBus.dispatch({
-      key: 'on_start'
-    })
+    mainWindow.webContents.send('start')
 
     let count = 0
-    for (const [key, { name, genderTitle, personSubjects }] of Object.entries(grouped)) {
+    for (const [key, { name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
       count += 1
       const mergedPdf = await PDFDocument.create();
-      const subjectType = key.split('|')[1]
+      const [formattedName, subjectType] = key.split('|')
 
       for (const subject of personSubjects) {
         const html = htmlTemplate
-          .replace('{{SUBJECTTYPE}}', subjectType)
+          .replace('{{SUBJECTTYPE}}', type)
           .replace('{{NAME}}', name)
           .replace('{{SUBJECT}}', subject)
           .replace('{{GENDERPOSTFIX}}', genderTitle)
@@ -188,17 +188,12 @@ ipcMain.handle('generate-pdf-2', async (event, {
       mergedPdf.setModificationDate(new Date());
 
       const finalPdfData = await mergedPdf.save();
-      fs.writeFileSync(path.join(saveDir, `${key}.pdf`), finalPdfData);
+      fs.writeFileSync(path.join(saveDir, `${formattedName}(${subjectType}).pdf`), finalPdfData);
     }
 
-    AppEventBus.dispatch({
-      key: 'on_done',
-      arg: count
-    })
+    mainWindow.webContents.send('done', count)
   } catch (e) {
     console.log('err: ', e)
-    AppEventBus.dispatch({
-      key: 'on_start'
-    })
+    mainWindow.webContents.send('error')
   }
 });
