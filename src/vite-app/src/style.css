@@ -75,3 +75,38 @@ table {
 .n-divider {
   margin: 0 !important;
 }
+
+:root {
+  --shine-duration: 5s;
+  /* скорость движения */
+  --shine-color-light: #f0f0f0;
+  /* светлый фон */
+  --shine-color-dark: #e0e0e0;
+  /* чуть темнее фон */
+}
+
+.shine-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  /* клики проходят сквозь */
+  background: linear-gradient(90deg,
+      var(--shine-color-dark) 0%,
+      var(--shine-color-light) 20%,
+      var(--shine-color-dark) 40%,
+      var(--shine-color-dark) 100%);
+  background-size: 200% 100%;
+  animation: shine-move var(--shine-duration) linear infinite;
+  opacity: 0.5;
+}
+
+@keyframes shine-move {
+  from {
+    background-position: 0% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}

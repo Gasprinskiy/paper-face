@@ -21,3 +21,7 @@ export type SubjectOption = CommonOptionWithID;
 export interface CreateFileNameParam extends CommonOption {
   gender_title: string;
 }
+
+export interface SubjectTypeOption extends CommonOption {
+  type: string;
+}

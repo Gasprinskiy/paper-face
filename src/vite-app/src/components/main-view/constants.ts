@@ -12,6 +12,11 @@ export const SubjectTypeNames: Record<SubjectType, string> = {
   [SubjectType.DEFAULT]: 'Классная работа',
 };
 
+export const SubjectTypeTemplateNames: Record<SubjectType, string> = {
+  [SubjectType.TEST]: 'контрольная работа',
+  [SubjectType.DEFAULT]: 'работа',
+};
+
 export const GenderPostfixByKey: Record<Gender, string> = {
   [Gender.MALE]: 'ка',
   [Gender.FEMALE]: 'цы',

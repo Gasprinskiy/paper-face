@@ -7,11 +7,11 @@ import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
 
-import type { CommonOption, CreateFileNameParam, NameOption, SubjectOption } from '@/shared/types';
+import type { CreateFileNameParam, NameOption, SubjectOption, SubjectTypeOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
 
-import { DropDownOptions, GenderPostfixByKey, SubjectTypeNames } from './constants';
+import { DropDownOptions, GenderPostfixByKey, SubjectTypeNames, SubjectTypeTemplateNames } from './constants';
 import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
@@ -23,6 +23,7 @@ const nameList = useNamesListStorage();
 const subjectsList = useSubjectsListStorage();
 const { showModal } = useModal();
 
+const loading = shallowRef<boolean>(false);
 const nameValue = shallowRef<string[]>([]);
 const subjectValue = shallowRef<string[]>([]);
 const subjectTypeValue = shallowRef<SubjectType[]>([SubjectType.DEFAULT]);
@@ -54,7 +55,6 @@ function onSubjectTypeUpdate(value: any[]) {
 }
 
 async function onSubmitCreate() {
-  // let names = nameValue.value;
   if (nameList.value.length === 0) {
     message.error('Список учеников пуст', {
       duration: 3000,
@@ -76,7 +76,7 @@ async function onSubmitCreate() {
       declension,
     };
   });
-  let pickedSubjects: string[] = subjectsList.value.map(({ declension }) => declension);
+  let pickedSubjects: string[] = subjectsList.value.map(({ declension }) => declension.toLowerCase());
 
   if (nameValue.value.length > 0) {
     const listMap = nameList.value.reduce((acc, cur) => {
@@ -105,18 +105,19 @@ async function onSubmitCreate() {
       return acc;
     }, new Map<string, SubjectOption>());
 
-    pickedSubjects = subjectValue.value.map(id => listMap.get(id)!).map(({ declension }) => declension);
+    pickedSubjects = subjectValue.value.map(id => listMap.get(id)!).map(({ declension }) => declension.toLowerCase());
   }
 
   try {
     const windowEAPI = window as WindowWithElectronApi;
-    let subjectTypes: CommonOption[] = [];
+    let subjectTypes: SubjectTypeOption[] = [];
 
     for (const element of subjectTypeValue.value) {
-      const result = await declineWord(SubjectTypeNames[element], 'genitive', true);
+      const result = await declineWord(SubjectTypeTemplateNames[element], 'genitive', true);
       subjectTypes = [...subjectTypes, {
         name: SubjectTypeNames[element],
-        declension: result.toLowerCase(),
+        declension: result,
+        type: element,
       }];
     }
 
@@ -124,7 +125,9 @@ async function onSubmitCreate() {
       subjects: pickedSubjects,
       names: pickedNames,
       subjectTypes,
-      groupName: '3 Е',
+      groupNumber: 3,
+      groupID: 'E',
+      schoolNumber: '247',
     });
   } catch (e) {
     console.error(e);
@@ -161,6 +164,7 @@ onMounted(() => {
   const windowEAPI = window as WindowWithElectronApi;
 
   windowEAPI.electronAPI?.on('start', () => {
+    loading.value = true;
     loadingMessage = message.loading('Идет создание файлов, это может занять какое-то время', {
       duration: 0,
     });
@@ -170,17 +174,20 @@ onMounted(() => {
     loadingMessage?.destroy();
     const countPlur = pluralize(count, 'файл', 'файла', 'файлов');
     message.success(`Создано ${count} ${countPlur}`);
+    loading.value = false;
   });
 
   windowEAPI.electronAPI?.on('error', () => {
     loadingMessage?.destroy();
     message.error(`Произошла ошибка при создании файлов`);
+    loading.value = false;
   });
 });
 </script>
 
 <template>
   <div class="main-view">
+    <div v-show="loading" class="main-view__skeleton shine-screen" />
     <div class="main-view__head">
       <h1>Paper Face</h1>
       <NDropdown
@@ -233,7 +240,7 @@ onMounted(() => {
           />
           <NCheckbox
             :value="SubjectType.TEST"
-            :label="SubjectTypeNames[SubjectType.DEFAULT]"
+            :label="SubjectTypeNames[SubjectType.TEST]"
           />
         </NCheckboxGroup>
       </div>

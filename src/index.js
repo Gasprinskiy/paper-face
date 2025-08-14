@@ -15,8 +15,8 @@ let mainWindow;
 const createWindow = () => {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1280,
+    height: 720,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -61,12 +61,13 @@ app.on('window-all-closed', () => {
 // code. You can also put them in separate files and import them here.
 
 ipcMain.handle('generate-pdf', async (event, { names }) => {
-  const htmlTemplate = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
+  const htmlTemplate = fs.readFileSync(path.join(__dirname, './template/index.html'), 'utf8');
 
   // Выбираем папку для сохранения
   const { filePaths, canceled } = await dialog.showOpenDialog({
     properties: ['openDirectory'],
-    title: 'Выберите папку для PDF'
+    title: 'Выберите папку',
+    buttonLabel: 'Выбрать'
   });
 
   if (canceled || filePaths.length === 0) return;
@@ -114,26 +115,62 @@ ipcMain.handle('generate-pdf', async (event, { names }) => {
   }
 });
 
+function fontToBase64(fontPath) {
+  const fontBuffer = fs.readFileSync(fontPath);
+  return fontBuffer.toString('base64');
+}
+
 ipcMain.handle('generate-pdf-2', async (event, {
   subjects,
   names,
   subjectTypes,
-  groupName,
+  groupNumber,
+  groupID,
+  schoolNumber
 }) => {
-  const htmlTemplate = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
+  let htmlTemplate = fs.readFileSync(path.join(__dirname, './template/index.html'), 'utf8');
+
+  // Встраиваем шрифты прямо в HTML
+  const fontDir = path.dirname(path.join(__dirname, './template/index.html'), 'utf8');
+
+  const fonts = {
+    'Monotype-Corsiva-Regular.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular.ttf')),
+    'Monotype-Corsiva-Regular-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular-Italic.ttf')),
+    'Monotype-Corsiva-Bold.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold.ttf')),
+    'Monotype-Corsiva-Bold-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold-Italic.ttf'))
+  };
+
+  // Заменяем url(...) в HTML на data: ссылки
+  htmlTemplate = htmlTemplate.replace(
+    /url\('Monotype-Corsiva-Regular\.ttf'\)/g,
+    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular.ttf']}')`
+  ).replace(
+    /url\('Monotype-Corsiva-Regular-Italic\.ttf'\)/g,
+    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular-Italic.ttf']}')`
+  ).replace(
+    /url\('Monotype-Corsiva-Bold\.ttf'\)/g,
+    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold.ttf']}')`
+  ).replace(
+    /url\('Monotype-Corsiva-Bold-Italic\.ttf'\)/g,
+    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold-Italic.ttf']}')`
+  );
   // Выбираем папку для сохранения
   const { filePaths, canceled } = await dialog.showOpenDialog({
     properties: ['openDirectory'],
-    title: 'Выберите папку для PDF'
+    title: 'Выберите папку',
+    buttonLabel: 'Выбрать'
   });
 
+  console.log(groupNumber,
+    groupID,
+    schoolNumber)
   if (canceled || filePaths.length === 0) return;
 
   const saveDir = filePaths[0];
   const grouped = {};
   for (const person of names) {
     for (const subjectType of subjectTypes) {
-      const key = `${person.name.replace(/\s+/g, '_')}|${subjectType.name}`;
+      const key = `${person.name.replace(/\s+/g, '_')}|${subjectType.name}|${subjectType.type}`;
       grouped[key] = {
         name: person.declension,
         genderTitle: person.gender_title,
@@ -151,17 +188,30 @@ ipcMain.handle('generate-pdf-2', async (event, {
     for (const [key, { name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
       count += 1
       const mergedPdf = await PDFDocument.create();
-      const [formattedName, subjectType] = key.split('|')
+      const [formattedName, subjectType, subjectKey] = key.split('|')
 
       for (const subject of personSubjects) {
-        const html = htmlTemplate
+        let html = htmlTemplate
           .replace('{{SUBJECTTYPE}}', type)
           .replace('{{NAME}}', name)
           .replace('{{SUBJECT}}', subject)
           .replace('{{GENDERPOSTFIX}}', genderTitle)
-          .replace('{{GROUPNAME}}', groupName);
+          .replace('{{GROUPNUMBER}}', groupNumber)
+          .replace('{{GROUPID}}', groupID)
+          .replace('{{SCHOOLNUMBER}}', schoolNumber);
 
-        const pdfWindow = new BrowserWindow({ show: false });
+        if (subjectKey.toLowerCase() === 'test') {
+          html = html.replace('{{NEXTLINESET}}', '<br>')
+        } else {
+          html = html.replace('{{NEXTLINESET}}', '')
+        }
+
+        const pdfWindow = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            webSecurity: false
+          }
+        });
         await pdfWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
 
         const pdfData = await pdfWindow.webContents.printToPDF({

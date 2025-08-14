@@ -6,12 +6,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     subjects,
     names,
     subjectTypes,
-    groupName,
+    groupNumber,
+    groupID,
+    schoolNumber
   }) => ipcRenderer.invoke('generate-pdf-2', {
     subjects,
     names,
     subjectTypes,
-    groupName,
+    groupNumber,
+    groupID,
+    schoolNumber
   }),
   send: (channel, data) => ipcRenderer.send(channel, data),
   on: (channel, callback) => ipcRenderer.on(channel, (event, args) => callback(args)),
