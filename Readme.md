@@ -51,23 +51,3 @@ project/
 └── README.md
 ```
 
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/pdf-cover-generator.git
-
-# Enter the project folder
-cd pdf-cover-generator
-
-# Install dependencies
-npm install
-```
-
-## Build
-
-```bash
-# Build the Electron application
-npm run build
-```
-
