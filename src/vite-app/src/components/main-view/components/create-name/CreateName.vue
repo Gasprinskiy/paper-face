@@ -1,15 +1,14 @@
 <script lang="ts" setup>
 import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, NUpload, useMessage } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
-import { computed, reactive, ref, shallowReactive, shallowRef, toRaw } from 'vue';
+import { computed, ref, shallowRef, toRaw } from 'vue';
+import type { ShallowRef } from 'vue';
 import { SaveOutline, TrashBinOutline } from '@vicons/ionicons5';
 import { required } from '@vuelidate/validators';
 import useVuelidate from '@vuelidate/core';
-import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import * as XLSX from 'xlsx';
 
 import { declineWord } from '@/packages/name_decl';
-import { deepClone } from '@/packages/object';
+import { deepClone, invertRecord } from '@/packages/object';
 import type { NameOption } from '@/shared/types';
 import { Gender } from '@/shared/types';
 import { useNamesListStorage } from '@/composables/storage';
@@ -17,6 +16,7 @@ import { useNamesListStorage } from '@/composables/storage';
 import { ActionNames } from '../../constants';
 import { ActionMode } from '../../types';
 import { GenderOptions } from './constants';
+import { readExcelFile } from '@/packages/file_reader';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
@@ -25,22 +25,39 @@ const nameVal = shallowRef<string>('');
 const genderVal = shallowRef<Gender | null>(null);
 const list = ref<NameOption[]>(deepClone(toRaw(nameList.value)));
 
+const loading = shallowRef<boolean>(false);
 const uploadedFile = shallowRef<UploadFileInfo | null>(null);
-const nameRowKey = shallowRef<string>('');
-const genderRowKey = shallowRef<string>('');
-const genderKeys = shallowReactive<Record<Gender, string>>({
-  [Gender.MALE]: '',
-  [Gender.FEMALE]: '',
+
+const nameHeaderKey = shallowRef<string>('');
+const genderHeaderKey = shallowRef<string>('');
+const genderKeys = shallowRef<Record<Gender, ShallowRef<string>>>({
+  [Gender.MALE]: shallowRef<string>(''),
+  [Gender.FEMALE]: shallowRef<string>(''),
 });
 
-const validatos = {
+const validators = {
   name: { required },
   gender: { required },
 };
 
-const v$ = useVuelidate(validatos, {
+const fileValuesValidators = {
+  name_key: { required },
+  gender_key: { required },
+  gender_value_key: {
+    [Gender.MALE]: { required },
+    [Gender.FEMALE]: { required },
+  },
+};
+
+const v$ = useVuelidate(validators, {
   name: nameVal,
   gender: genderVal,
+});
+
+const v$_file = useVuelidate(fileValuesValidators, {
+  name_key: nameHeaderKey,
+  gender_key: genderHeaderKey,
+  gender_value_key: genderKeys,
 });
 
 const singleFileList = computed<UploadFileInfo[]>({
@@ -96,7 +113,7 @@ async function onRedact(index: number, value: NameOption) {
 }
 
 function onRemove(removeIndex: number, removeValue: NameOption) {
-  const filtered = nameList.value.filter((value, index) => index !== removeIndex && value.name !== removeValue.name);
+  const filtered = nameList.value.filter((value, index) => index !== removeIndex && value.id !== removeValue.id);
 
   nameList.value = filtered;
   list.value = filtered;
@@ -104,27 +121,86 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
   message.warning('Ученик удален');
 }
 
-function handleFileUpload() {
+async function handleFileUpload() {
   const file = uploadedFile.value?.file;
   if (!file) {
+    message.error('Файл не выбран');
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (e: any) => {
-    const arrayBuffer = e.target.result;
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const array = XLSX.utils.sheet_to_json(worksheet);
-    console.log('array: ', array);
-  };
-  reader.readAsArrayBuffer(file);
+  const valid = await v$_file.value.$validate();
+  if (!valid) {
+    message.error('Поля заполнены не полностью');
+    return;
+  }
+
+  const loadingMessage = message.loading('Ваш файл в обработке, подождите', {
+    duration: 0,
+  });
+  loading.value = true;
+
+  try {
+    const array = await readExcelFile<Record<string, string>>(file);
+    const processedCount = await processNamesArray(array);
+    message.success(`Добавлено ${processedCount} из ${array.length} записей`);
+  } catch (e) {
+    console.error('excel parse error: ', e);
+    message.error('Не удалось прочитать файл');
+  } finally {
+    loadingMessage.destroy();
+    loading.value = false;
+  }
+}
+
+async function processNamesArray(array: Record<string, string>[]): Promise<number> {
+  let count = 0;
+  let newArray: NameOption[] = [];
+
+  const invertedGenderKeys = invertRecord({
+    [Gender.MALE]: toRaw(genderKeys.value[Gender.MALE].value.trim()),
+    [Gender.FEMALE]: toRaw(genderKeys.value[Gender.FEMALE].value.trim()),
+  });
+
+  for (const element of array) {
+    const name = element[nameHeaderKey.value];
+    const genderKey = element[genderHeaderKey.value];
+    if (!name || !genderKey) {
+      continue;
+    }
+
+    const gender = invertedGenderKeys[genderKey];
+    if (!gender) {
+      continue;
+    }
+
+    try {
+      const nameDeclension = await declineWord(name.trim(), 'genitive');
+      const newValue: NameOption = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        declension: nameDeclension,
+        gender,
+      };
+
+      newArray = [...newArray, newValue];
+
+      count += 1;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  nameList.value = [...nameList.value, ...newArray];
+  list.value = [...list.value, ...newArray];
+
+  return count;
 }
 </script>
 
 <template>
   <div class="create-name-view">
+    <div v-show="loading" class="create-name-view__skeleton shine-screen" />
+
     <h2>{{ ActionNames[ActionMode.NAMES] }}</h2>
 
     <form
@@ -137,29 +213,29 @@ function handleFileUpload() {
         accept=".xlsx"
       >
         <NButton type="info">
-          Выбрать .xlsx файл
+          Выбрать excel файл
         </NButton>
       </NUpload>
 
       <NInput
-        v-model:value="nameRowKey"
-        placeholder="Укажите заголовок фамилии и имени как в табилице"
+        v-model:value="nameHeaderKey"
+        placeholder="Заголовок колонны фамилий и имен как в табилице"
       />
 
       <NInput
-        v-model:value="genderRowKey"
-        placeholder="Укажите заголовок пола как в табилице"
+        v-model:value="genderHeaderKey"
+        placeholder="Заголовок колонны полов как в табилице"
       />
 
-      <div>
+      <div class="create-name-view__file-form_input-row">
         <NInput
-          v-model:value="genderKeys.male"
-          placeholder="Укажите значение отвечающая за мужской пол в таблице"
+          v-model:value="genderKeys.male.value"
+          placeholder="Значение отвечающее за мужской пол в таблице"
         />
 
         <NInput
-          v-model:value="genderKeys.female"
-          placeholder="Укажите значение отвечающая за женский пол в таблице"
+          v-model:value="genderKeys.female.value"
+          placeholder="Значение отвечающее за женский пол в таблице"
         />
       </div>
 

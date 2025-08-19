@@ -67,7 +67,7 @@ async function onRedact(index: number, value: SubjectOption) {
 }
 
 function onRemove(removeIndex: number, removeValue: SubjectOption) {
-  const filtered = subjectsList.value.filter((value, index) => index !== removeIndex && value.name !== removeValue.name);
+  const filtered = subjectsList.value.filter((value, index) => index !== removeIndex && value.id !== removeValue.id);
 
   subjectsList.value = filtered;
   list.value = filtered;

@@ -3,9 +3,31 @@
   flex-direction: column;
   gap: 25px;
 
+  &__skeleton {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
   &__form {
     display: flex;
     gap: 5px;
+  }
+
+  &__file-form {
+    .n-upload-trigger {
+      width: 100%;
+    }
+
+    .n-upload-trigger .n-button {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    &_input-row {
+      display: flex;
+      gap: 5px;
+    }
   }
 
   &__list {

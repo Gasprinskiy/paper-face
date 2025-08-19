@@ -100,3 +100,15 @@ export function deepClone<T>(value: T): T {
 
   return _clone(value);
 }
+
+export function invertRecord<K extends string | number | symbol, V extends string | number | symbol>(
+  record: Record<K, V>,
+): Record<V, K> {
+  const inverted: Partial<Record<V, K>> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    inverted[value as V] = key as K;
+  }
+
+  return inverted as Record<V, K>;
+}
