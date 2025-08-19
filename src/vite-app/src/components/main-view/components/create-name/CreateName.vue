@@ -143,6 +143,8 @@ async function handleFileUpload() {
     const array = await readExcelFile<Record<string, string>>(file);
     const processedCount = await processNamesArray(array);
     message.success(`Добавлено ${processedCount} из ${array.length} записей`);
+
+    resetFileLoadFields();
   } catch (e) {
     console.error('excel parse error: ', e);
     message.error('Не удалось прочитать файл');
@@ -162,8 +164,8 @@ async function processNamesArray(array: Record<string, string>[]): Promise<numbe
   });
 
   for (const element of array) {
-    const name = element[nameHeaderKey.value];
-    const genderKey = element[genderHeaderKey.value];
+    const name = element[nameHeaderKey.value.trim()];
+    const genderKey = element[genderHeaderKey.value.trim()];
     if (!name || !genderKey) {
       continue;
     }
@@ -194,6 +196,14 @@ async function processNamesArray(array: Record<string, string>[]): Promise<numbe
   list.value = [...list.value, ...newArray];
 
   return count;
+}
+
+function resetFileLoadFields() {
+  uploadedFile.value = null;
+  nameHeaderKey.value = '';
+  genderHeaderKey.value = '';
+  genderKeys.value.male.value = '';
+  genderKeys.value.female.value = '';
 }
 </script>
 
