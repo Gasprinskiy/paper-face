@@ -1,10 +1,12 @@
 <script lang="ts" setup>
-import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, useMessage } from 'naive-ui';
-import { ref, shallowRef, toRaw } from 'vue';
+import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, NUpload, useMessage } from 'naive-ui';
+import type { UploadFileInfo } from 'naive-ui';
+import { computed, reactive, ref, shallowReactive, shallowRef, toRaw } from 'vue';
 import { SaveOutline, TrashBinOutline } from '@vicons/ionicons5';
 import { required } from '@vuelidate/validators';
 import useVuelidate from '@vuelidate/core';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
+import * as XLSX from 'xlsx';
 
 import { declineWord } from '@/packages/name_decl';
 import { deepClone } from '@/packages/object';
@@ -14,7 +16,7 @@ import { useNamesListStorage } from '@/composables/storage';
 
 import { ActionNames } from '../../constants';
 import { ActionMode } from '../../types';
-import { GenderNameByKey } from './constants';
+import { GenderOptions } from './constants';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
@@ -22,6 +24,14 @@ const nameList = useNamesListStorage();
 const nameVal = shallowRef<string>('');
 const genderVal = shallowRef<Gender | null>(null);
 const list = ref<NameOption[]>(deepClone(toRaw(nameList.value)));
+
+const uploadedFile = shallowRef<UploadFileInfo | null>(null);
+const nameRowKey = shallowRef<string>('');
+const genderRowKey = shallowRef<string>('');
+const genderKeys = shallowReactive<Record<Gender, string>>({
+  [Gender.MALE]: '',
+  [Gender.FEMALE]: '',
+});
 
 const validatos = {
   name: { required },
@@ -33,16 +43,15 @@ const v$ = useVuelidate(validatos, {
   gender: genderVal,
 });
 
-const genderOptions: SelectMixedOption[] = [
-  {
-    value: Gender.MALE,
-    label: GenderNameByKey[Gender.MALE],
+const singleFileList = computed<UploadFileInfo[]>({
+  get(): UploadFileInfo[] {
+    return uploadedFile.value ? [uploadedFile.value] : [];
   },
-  {
-    value: Gender.FEMALE,
-    label: GenderNameByKey[Gender.FEMALE],
+
+  set(value: UploadFileInfo[]) {
+    uploadedFile.value = value[value.length - 1];
   },
-];
+});
 
 async function onCreate() {
   const valid = await v$.value.$validate();
@@ -94,11 +103,77 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
 
   message.warning('Ученик удален');
 }
+
+function handleFileUpload() {
+  const file = uploadedFile.value?.file;
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e: any) => {
+    const arrayBuffer = e.target.result;
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const array = XLSX.utils.sheet_to_json(worksheet);
+    console.log('array: ', array);
+  };
+  reader.readAsArrayBuffer(file);
+}
 </script>
 
 <template>
   <div class="create-name-view">
     <h2>{{ ActionNames[ActionMode.NAMES] }}</h2>
+
+    <form
+      class="create-name-view__form create-name-view__file-form"
+      @submit.prevent="handleFileUpload"
+    >
+      <NUpload
+        v-model:file-list="singleFileList"
+        :multiple="false"
+        accept=".xlsx"
+      >
+        <NButton type="info">
+          Выбрать .xlsx файл
+        </NButton>
+      </NUpload>
+
+      <NInput
+        v-model:value="nameRowKey"
+        placeholder="Укажите заголовок фамилии и имени как в табилице"
+      />
+
+      <NInput
+        v-model:value="genderRowKey"
+        placeholder="Укажите заголовок пола как в табилице"
+      />
+
+      <div>
+        <NInput
+          v-model:value="genderKeys.male"
+          placeholder="Укажите значение отвечающая за мужской пол в таблице"
+        />
+
+        <NInput
+          v-model:value="genderKeys.female"
+          placeholder="Укажите значение отвечающая за женский пол в таблице"
+        />
+      </div>
+
+      <div class="create-name-view__add-btn">
+        <NButton
+          type="primary"
+          attr-type="submit"
+        >
+          Обработать
+        </NButton>
+      </div>
+    </form>
+
+    <NDivider>Или добавьте в ручную</NDivider>
 
     <form
       class="create-name-view__form"
@@ -112,7 +187,7 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
       <NSelect
         v-model:value="genderVal"
         placeholder="Пол"
-        :options="genderOptions"
+        :options="GenderOptions"
       />
 
       <div class="create-name-view__add-btn">
@@ -161,7 +236,7 @@ function onRemove(removeIndex: number, removeValue: NameOption) {
             <NSelect
               v-model:value="value.gender"
               placeholder="Пол"
-              :options="genderOptions"
+              :options="GenderOptions"
             />
           </td>
 
