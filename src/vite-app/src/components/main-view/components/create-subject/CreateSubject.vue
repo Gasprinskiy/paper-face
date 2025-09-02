@@ -41,7 +41,16 @@ async function addName() {
 
   const uuid = crypto.randomUUID();
   const trimName = nameVal.value.trim();
-  const nameDeclension = isLangCodeRu.value ? await declineWord(trimName, 'dative') : trimName;
+
+  let nameDeclension = trimName;
+  if (isLangCodeRu.value) {
+    try {
+      nameDeclension = await declineWord(trimName, 'dative');
+    } catch {
+      message.error('Ошбика при сколнении слова, возожно вы выбрали не тот язык');
+      return;
+    }
+  }
 
   subjectsList.value = [...subjectsList.value, {
     id: uuid,
@@ -59,7 +68,16 @@ async function addName() {
 
 async function onRedact(index: number, value: SubjectOption) {
   const trimName = value.name.trim();
-  const nameDeclension = await declineWord(value.name, 'genitive');
+
+  let nameDeclension = trimName;
+  if (value.lang_code === LangCode.RU) {
+    try {
+      nameDeclension = await declineWord(value.name, 'dative');
+    } catch {
+      message.error('Ошбика при сколнении слова, возожно вы выбрали не тот язык');
+      return;
+    }
+  }
 
   subjectsList.value[index] = {
     id: value.id,
@@ -120,6 +138,7 @@ function onRemove(removeIndex: number, removeValue: SubjectOption) {
           <tr>
             <th>Название предмета</th>
             <th>Сколнение</th>
+            <th>Язык</th>
             <th />
           </tr>
         </thead>
@@ -140,6 +159,14 @@ function onRemove(removeIndex: number, removeValue: SubjectOption) {
               v-model:value="value.declension"
               placeholder="Склонение"
               disabled
+            />
+          </td>
+
+          <td>
+            <NSelect
+              v-model:value="value.lang_code"
+              :options="LangOptions"
+              placeholder="Язык"
             />
           </td>
 

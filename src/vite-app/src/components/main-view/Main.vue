@@ -2,11 +2,12 @@
 import { NButton, NCheckbox, NCheckboxGroup, NDropdown, NIcon, NSelect, useMessage } from 'naive-ui';
 import type { MessageReactive } from 'naive-ui';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import { computed, onMounted, shallowRef, toRaw, watch, watchEffect } from 'vue';
+import { computed, onMounted, shallowRef, toRaw } from 'vue';
 import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
 
+import { LangCode } from '@/shared/types';
 import type { CreateFileNameParam, NameOption, SubjectOption, SubjectTypeOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
@@ -18,6 +19,7 @@ import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
 import { useHotKeys } from '@/composables/use_hotkeys';
+import { transliterate } from 'transliteration';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
@@ -80,7 +82,12 @@ async function onSubmitCreate() {
       declension,
     };
   });
-  let pickedSubjects: string[] = subjectsList.value.map(({ declension }) => declension.toLowerCase());
+  let pickedSubjects: SubjectOption[] = subjectsList.value.map((subject) => {
+    return {
+      ...subject,
+      declension: subject.declension.toLowerCase(),
+    };
+  });
 
   if (nameValue.value.length > 0) {
     const listMap = nameList.value.reduce((acc, cur) => {
@@ -109,8 +116,23 @@ async function onSubmitCreate() {
       return acc;
     }, new Map<string, SubjectOption>());
 
-    pickedSubjects = subjectValue.value.map(id => listMap.get(id)!).map(({ declension }) => declension.toLowerCase());
+    pickedSubjects = subjectValue.value.map(id => listMap.get(id)!).map((subject) => {
+      return {
+        ...subject,
+        declension: subject.declension.toLowerCase(),
+      };
+    });
   }
+
+  const translitMap: Record<string, Record<LangCode, string>> = pickedNames.reduce((acc, { name, declension }) => {
+    const transliterated = transliterate(name);
+    acc[name] = {
+      [LangCode.EN]: transliterated,
+      [LangCode.UZ]: transliterated,
+      [LangCode.RU]: declension,
+    };
+    return acc;
+  }, {} as Record<string, Record<LangCode, string>>);
 
   try {
     const windowEAPI = window as WindowWithElectronApi;
@@ -129,6 +151,7 @@ async function onSubmitCreate() {
       subjects: pickedSubjects,
       names: pickedNames,
       subjectTypes,
+      translitMap,
       groupNumber: 3,
       groupID: 'E',
       schoolNumber: '247',

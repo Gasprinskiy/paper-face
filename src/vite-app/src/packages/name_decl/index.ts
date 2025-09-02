@@ -33,14 +33,11 @@ export async function declineWord(
 }
 
 export function pluralize(count: number, one: string, few: string, many: string): string {
-  count = Math.abs(count) % 100;
-  const lastDigit = count % 10;
-
-  if (lastDigit > 1 && lastDigit < 5) {
+  if (count > 1 && count < 5) {
     return few;
   }
 
-  if (lastDigit === 1) {
+  if (count === 1) {
     return one;
   }
 
