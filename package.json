@@ -1,7 +1,7 @@
 {
   "name": "paper-face",
   "productName": "paper-face",
-  "version": "1.7.0",
+  "version": "1.8.1",
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
