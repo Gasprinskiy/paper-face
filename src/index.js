@@ -162,9 +162,6 @@ ipcMain.handle('generate-pdf-2', async (event, {
     buttonLabel: 'Выбрать'
   });
 
-  console.log(groupNumber,
-    groupID,
-    schoolNumber)
   if (canceled || filePaths.length === 0) return;
 
   const saveDir = filePaths[0];
@@ -193,7 +190,6 @@ ipcMain.handle('generate-pdf-2', async (event, {
       const [formattedName, subjectType, subjectKey] = key.split('|')
 
       for (const subject of personSubjects) {
-        console.log("subject.lang_code: ", subject.lang_code)
         const htmlTemplate = getHtmlBylangCode(subject.lang_code)
         const tName = translitMap[source_name][subject.lang_code]
 
