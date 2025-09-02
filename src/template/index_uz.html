@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @font-face {
+      font-family: 'Monotype Corsiva';
+      src: url('Monotype-Corsiva-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'Monotype Corsiva';
+      src: url('Monotype-Corsiva-Regular-Italic.ttf') format('truetype');
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    @font-face {
+      font-family: 'Monotype Corsiva';
+      src: url('Monotype-Corsiva-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'Monotype Corsiva';
+      src: url('Monotype-Corsiva-Bold-Italic.ttf') format('truetype');
+      font-weight: 700;
+      font-style: italic;
+    }
+
+    @page {
+      size: A4 landscape;
+      margin: 0;
+      /* font-family: 'MTCORSVA', cursive; */
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 297mm;
+      height: 210mm;
+      display: flex;
+      justify-content: right;
+      margin: 0;
+      padding: 0;
+      background: white;
+      font-family: 'Monotype Corsiva', cursive;
+    }
+
+    .content {
+      width: 170mm;
+      height: 210mm;
+      display: flex;
+      justify-content: center;
+    }
+
+    .bage {
+      border-radius: 3px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4cm;
+    }
+
+    .bage h2 {
+      font-size: 28px;
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
+    .bage p {
+      font-size: 28px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="content">
+    <div class="bage">
+      <h2>{{SCHOOLNUMBER}}-sonli maktabning</h2>
+      <h2>{{GROUPNUMBER}} «{{GROUPID}}» sinf o’quvchisi</h2>
+      <p><b>{{NAME}}ning</b></p>
+      <p>{{SUBJECT}} fanidan</p>
+      <p><b>{{SUBJECTTYPE}}</b> daftari</p>
+    </div>
+  </div>
+</body>
+
+</html>
