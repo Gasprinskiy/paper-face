@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     subjects,
     names,
     subjectTypes,
+    translitMap,
     groupNumber,
     groupID,
     schoolNumber
@@ -13,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     subjects,
     names,
     subjectTypes,
+    translitMap,
     groupNumber,
     groupID,
     schoolNumber

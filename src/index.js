@@ -124,36 +124,37 @@ ipcMain.handle('generate-pdf-2', async (event, {
   subjects,
   names,
   subjectTypes,
+  translitMap,
   groupNumber,
   groupID,
   schoolNumber
 }) => {
-  let htmlTemplate = fs.readFileSync(path.join(__dirname, './template/index.html'), 'utf8');
+  // let htmlTemplate = fs.readFileSync(path.join(__dirname, './template/index.html'), 'utf8');
 
-  // Встраиваем шрифты прямо в HTML
-  const fontDir = path.dirname(path.join(__dirname, './template/index.html'), 'utf8');
+  // // Встраиваем шрифты прямо в HTML
+  // const fontDir = path.dirname(path.join(__dirname, './template/index.html'), 'utf8');
 
-  const fonts = {
-    'Monotype-Corsiva-Regular.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular.ttf')),
-    'Monotype-Corsiva-Regular-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular-Italic.ttf')),
-    'Monotype-Corsiva-Bold.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold.ttf')),
-    'Monotype-Corsiva-Bold-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold-Italic.ttf'))
-  };
+  // const fonts = {
+  //   'Monotype-Corsiva-Regular.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular.ttf')),
+  //   'Monotype-Corsiva-Regular-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Regular-Italic.ttf')),
+  //   'Monotype-Corsiva-Bold.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold.ttf')),
+  //   'Monotype-Corsiva-Bold-Italic.ttf': fontToBase64(path.join(fontDir, 'Monotype-Corsiva-Bold-Italic.ttf'))
+  // };
 
-  // Заменяем url(...) в HTML на data: ссылки
-  htmlTemplate = htmlTemplate.replace(
-    /url\('Monotype-Corsiva-Regular\.ttf'\)/g,
-    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular.ttf']}')`
-  ).replace(
-    /url\('Monotype-Corsiva-Regular-Italic\.ttf'\)/g,
-    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular-Italic.ttf']}')`
-  ).replace(
-    /url\('Monotype-Corsiva-Bold\.ttf'\)/g,
-    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold.ttf']}')`
-  ).replace(
-    /url\('Monotype-Corsiva-Bold-Italic\.ttf'\)/g,
-    `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold-Italic.ttf']}')`
-  );
+  // // Заменяем url(...) в HTML на data: ссылки
+  // htmlTemplate = htmlTemplate.replace(
+  //   /url\('Monotype-Corsiva-Regular\.ttf'\)/g,
+  //   `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular.ttf']}')`
+  // ).replace(
+  //   /url\('Monotype-Corsiva-Regular-Italic\.ttf'\)/g,
+  //   `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Regular-Italic.ttf']}')`
+  // ).replace(
+  //   /url\('Monotype-Corsiva-Bold\.ttf'\)/g,
+  //   `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold.ttf']}')`
+  // ).replace(
+  //   /url\('Monotype-Corsiva-Bold-Italic\.ttf'\)/g,
+  //   `url('data:font/ttf;base64,${fonts['Monotype-Corsiva-Bold-Italic.ttf']}')`
+  // );
   // Выбираем папку для сохранения
   const { filePaths, canceled } = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -172,6 +173,7 @@ ipcMain.handle('generate-pdf-2', async (event, {
     for (const subjectType of subjectTypes) {
       const key = `${person.name.replace(/\s+/g, '_')}|${subjectType.name}|${subjectType.type}`;
       grouped[key] = {
+        source_name: person.name,
         name: person.declension,
         genderTitle: person.gender_title,
         personSubjects: subjects,
@@ -185,18 +187,20 @@ ipcMain.handle('generate-pdf-2', async (event, {
     mainWindow.webContents.send('start')
 
     let count = 0
-    for (const [key, { name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
+    for (const [key, { source_name, name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
       count += 1
       const mergedPdf = await PDFDocument.create();
       const [formattedName, subjectType, subjectKey] = key.split('|')
 
       for (const subject of personSubjects) {
+        console.log("subject.lang_code: ", subject.lang_code)
         const htmlTemplate = getHtmlBylangCode(subject.lang_code)
+        const tName = translitMap[source_name][subject.lang_code]
 
         let html = htmlTemplate
           .replace('{{SUBJECTTYPE}}', type)
-          .replace('{{NAME}}', name)
-          .replace('{{SUBJECT}}', subject)
+          .replace('{{NAME}}', tName)
+          .replace('{{SUBJECT}}', subject.declension)
           .replace('{{GENDERPOSTFIX}}', genderTitle)
           .replace('{{GROUPNUMBER}}', groupNumber)
           .replace('{{GROUPID}}', groupID)

@@ -82,15 +82,20 @@
     .bage p {
       font-size: 28px;
     }
+
+    .bage .name {
+      letter-spacing: 2px;
+    }
   </style>
 </head>
 
 <body>
   <div class="content">
     <div class="bage">
-      <h2><b>${{NAME}}’s</b> notebook</h2>
-      <p>for <b>{{SUBJECT}}</b> {{SUBJECTTYPE}}</p>
-      <p>student of secondary school № {{SCHOOLNUMBER}}, group {{GROUPNUMBER}} «{{GROUPID}}»</p>
+      <h2><b class="name">{{NAME}}’s</b> copybook</h2>
+      <p>for <b>{{SUBJECT}}</b> classwork</p>
+      <p>student of secondary school № {{SCHOOLNUMBER}}</p>
+      <p>group {{GROUPNUMBER}} «{{GROUPID}}»</p>
     </div>
   </div>
 </body>
