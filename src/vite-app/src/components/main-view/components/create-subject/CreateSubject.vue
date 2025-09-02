@@ -1,23 +1,28 @@
 <script lang="ts" setup>
-import { NButton, NDivider, NIcon, NInput, NScrollbar, NTable, useMessage } from 'naive-ui';
+import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, useMessage } from 'naive-ui';
 import { SaveOutline, TrashBinOutline } from '@vicons/ionicons5';
 import { required } from '@vuelidate/validators';
-import { ref, shallowRef, toRaw } from 'vue';
+import { computed, ref, shallowRef, toRaw } from 'vue';
 
 import { declineWord } from '@/packages/name_decl';
 import { deepClone } from '@/packages/object';
+import { LangCode } from '@/shared/types';
 import type { SubjectOption } from '@/shared/types';
 import { useSubjectsListStorage } from '@/composables/storage';
 
 import { ActionNames } from '../../constants';
 import { ActionMode } from '../../types';
 import useVuelidate from '@vuelidate/core';
+import { LangOptions } from './constants';
 
 const message = useMessage();
 const subjectsList = useSubjectsListStorage();
 
 const nameVal = shallowRef<string>('');
+const langCode = shallowRef<LangCode>(LangCode.RU);
 const list = ref<SubjectOption[]>(deepClone(toRaw(subjectsList.value)));
+
+const isLangCodeRu = computed<boolean>(() => langCode.value === LangCode.RU);
 
 const validatos = {
   name: { required },
@@ -36,12 +41,13 @@ async function addName() {
 
   const uuid = crypto.randomUUID();
   const trimName = nameVal.value.trim();
-  const nameDeclension = await declineWord(trimName, 'dative');
+  const nameDeclension = isLangCodeRu.value ? await declineWord(trimName, 'dative') : trimName;
 
   subjectsList.value = [...subjectsList.value, {
     id: uuid,
     name: trimName,
     declension: nameDeclension,
+    lang_code: langCode.value,
   }];
 
   list.value = subjectsList.value;
@@ -59,6 +65,7 @@ async function onRedact(index: number, value: SubjectOption) {
     id: value.id,
     name: trimName,
     declension: nameDeclension,
+    lang_code: value.lang_code,
   };
 
   list.value[index] = subjectsList.value[index];
@@ -87,6 +94,12 @@ function onRemove(removeIndex: number, removeValue: SubjectOption) {
       <NInput
         v-model:value="nameVal"
         placeholder="Название предмета"
+      />
+
+      <NSelect
+        v-model:value="langCode"
+        :options="LangOptions"
+        placeholder="Язык"
       />
 
       <div class="create-subject-view__add-btn">

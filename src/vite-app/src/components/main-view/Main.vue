@@ -2,7 +2,7 @@
 import { NButton, NCheckbox, NCheckboxGroup, NDropdown, NIcon, NSelect, useMessage } from 'naive-ui';
 import type { MessageReactive } from 'naive-ui';
 import type { SelectMixedOption } from 'naive-ui/es/select/src/interface';
-import { computed, onMounted, shallowRef, toRaw } from 'vue';
+import { computed, onMounted, shallowRef, toRaw, watch, watchEffect } from 'vue';
 import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
@@ -10,20 +10,24 @@ import { Pencil } from '@vicons/ionicons5';
 import type { CreateFileNameParam, NameOption, SubjectOption, SubjectTypeOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
+import { useNamesListStorage, useSubjectsListStorage } from '@/composables/storage';
+import { declineWord, pluralize } from '@/packages/name_decl';
 
 import { DropDownOptions, GenderPostfixByKey, SubjectTypeNames, SubjectTypeTemplateNames } from './constants';
 import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
-import { useNamesListStorage, useSubjectsListStorage } from '@/composables/storage';
-import { declineWord, pluralize } from '@/packages/name_decl';
+import { useHotKeys } from '@/composables/use_hotkeys';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
 const subjectsList = useSubjectsListStorage();
 const { showModal } = useModal();
 
+useHotKeys();
+
 const loading = shallowRef<boolean>(false);
+
 const nameValue = shallowRef<string[]>([]);
 const subjectValue = shallowRef<string[]>([]);
 const subjectTypeValue = shallowRef<SubjectType[]>([SubjectType.DEFAULT]);
