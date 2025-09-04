@@ -170,7 +170,6 @@ ipcMain.handle('generate-pdf-2', async (event, {
     for (const subjectType of subjectTypes) {
       const key = `${person.name.replace(/\s+/g, '_')}|${subjectType.name}|${subjectType.type}`;
       grouped[key] = {
-        source_name: person.name,
         name: person.declension,
         genderTitle: person.gender_title,
         personSubjects: subjects,
@@ -184,18 +183,17 @@ ipcMain.handle('generate-pdf-2', async (event, {
     mainWindow.webContents.send('start')
 
     let count = 0
-    for (const [key, { source_name, name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
+    for (const [key, { name, genderTitle, personSubjects, type }] of Object.entries(grouped)) {
       count += 1
       const mergedPdf = await PDFDocument.create();
       const [formattedName, subjectType, subjectKey] = key.split('|')
 
       for (const subject of personSubjects) {
         const htmlTemplate = getHtmlBylangCode(subject.lang_code)
-        const tName = translitMap[source_name][subject.lang_code]
 
         let html = htmlTemplate
           .replace('{{SUBJECTTYPE}}', type)
-          .replace('{{NAME}}', tName)
+          .replace('{{NAME}}', name)
           .replace('{{SUBJECT}}', subject.declension)
           .replace('{{GENDERPOSTFIX}}', genderTitle)
           .replace('{{GROUPNUMBER}}', groupNumber)
