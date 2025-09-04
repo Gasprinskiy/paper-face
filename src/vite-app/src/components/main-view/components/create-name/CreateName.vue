@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, NUpload, useMessage } from 'naive-ui';
+import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NSwitch, NTable, NUpload, useMessage } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
 import { computed, ref, shallowRef, toRaw } from 'vue';
 import type { ShallowRef } from 'vue';
@@ -8,22 +8,23 @@ import { required } from '@vuelidate/validators';
 import useVuelidate from '@vuelidate/core';
 
 import { declineWord } from '@/packages/name_decl';
-import { deepClone, invertRecord } from '@/packages/object';
+import { deepCopyArrayOfObjects, deepCopyObject, invertRecord } from '@/packages/object';
 import type { NameOption } from '@/shared/types';
 import { Gender } from '@/shared/types';
 import { useNamesListStorage } from '@/composables/storage';
+import { readExcelFile } from '@/packages/file_reader';
 
 import { ActionNames } from '../../constants';
 import { ActionMode } from '../../types';
 import { GenderOptions } from './constants';
-import { readExcelFile } from '@/packages/file_reader';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
 
 const nameVal = shallowRef<string>('');
 const genderVal = shallowRef<Gender | null>(null);
-const list = ref<NameOption[]>(deepClone(toRaw(nameList.value)));
+const decline = shallowRef<boolean>(true);
+const list = ref<NameOption[]>(deepCopyArrayOfObjects(toRaw(nameList.value)));
 
 const loading = shallowRef<boolean>(false);
 const uploadedFile = shallowRef<UploadFileInfo | null>(null);
@@ -79,16 +80,25 @@ async function onCreate() {
 
   const uuid = crypto.randomUUID();
   const trimName = nameVal.value.trim();
-  const nameDeclension = await declineWord(trimName, 'genitive');
+  let nameDeclension = trimName;
+  if (decline.value) {
+    try {
+      nameDeclension = await declineWord(trimName, 'genitive');
+    } catch {
+      message.error('Ошбика при сколнении слова, возожно вы ввели не на том языке');
+      return;
+    }
+  }
 
   nameList.value = [...nameList.value, {
     id: uuid,
     name: trimName,
     declension: nameDeclension,
     gender: genderVal.value || Gender.MALE,
+    decline: decline.value,
   }];
 
-  list.value = nameList.value;
+  list.value = deepCopyArrayOfObjects(toRaw(nameList.value));
 
   nameVal.value = '';
   genderVal.value = null;
@@ -98,16 +108,26 @@ async function onCreate() {
 
 async function onRedact(index: number, value: NameOption) {
   const trimName = value.name.trim();
-  const nameDeclension = await declineWord(value.name, 'genitive');
+  let nameDeclension = trimName;
+  if (value.decline !== undefined && value.decline) {
+    try {
+      nameDeclension = await declineWord(trimName, 'genitive');
+    } catch {
+      message.error('Ошбика при сколнении слова, возожно вы ввели не на том языке');
+      list.value[index] = deepCopyObject(toRaw(nameList.value[index]));
+      return;
+    }
+  }
 
   nameList.value[index] = {
     id: value.id,
     name: trimName,
     declension: nameDeclension,
     gender: value.gender,
+    decline: value.decline,
   };
 
-  list.value[index] = nameList.value[index];
+  list.value[index] = deepCopyObject(toRaw(nameList.value[index]));
 
   message.success('Изменения сохранены');
 }
@@ -205,6 +225,19 @@ function resetFileLoadFields() {
   genderKeys.value.male.value = '';
   genderKeys.value.female.value = '';
 }
+
+function setAllDeclinible() {
+  for (const element of list.value) {
+    element.decline = !element.decline;
+  }
+}
+
+async function saveAll() {
+  for (let index = 0; index < list.value.length; index++) {
+    const element = list.value[index];
+    await onRedact(index, element);
+  }
+}
 </script>
 
 <template>
@@ -213,142 +246,177 @@ function resetFileLoadFields() {
 
     <h2>{{ ActionNames[ActionMode.NAMES] }}</h2>
 
-    <form
-      class="create-name-view__form create-name-view__file-form"
-      @submit.prevent="handleFileUpload"
-    >
-      <NUpload
-        v-model:file-list="singleFileList"
-        :multiple="false"
-        accept=".xlsx"
-      >
-        <NButton type="info">
-          Выбрать excel файл
-        </NButton>
-      </NUpload>
+    <div class="create-name-view__body">
+      <div class="create-name-view__body-left">
+        <form
+          class="create-name-view__form create-name-view__file-form"
+          @submit.prevent="handleFileUpload"
+        >
+          <NUpload
+            v-model:file-list="singleFileList"
+            :multiple="false"
+            accept=".xlsx"
+          >
+            <NButton type="info">
+              Выбрать excel файл
+            </NButton>
+          </NUpload>
 
-      <NInput
-        v-model:value="nameHeaderKey"
-        placeholder="Заголовок колонны фамилий и имен как в табилице"
-      />
+          <NInput
+            v-model:value="nameHeaderKey"
+            placeholder="Заголовок колонны фамилий и имен как в табилице"
+          />
 
-      <NInput
-        v-model:value="genderHeaderKey"
-        placeholder="Заголовок колонны полов как в табилице"
-      />
+          <NInput
+            v-model:value="genderHeaderKey"
+            placeholder="Заголовок колонны полов как в табилице"
+          />
 
-      <div class="create-name-view__file-form_input-row">
-        <NInput
-          v-model:value="genderKeys.male.value"
-          placeholder="Значение отвечающее за мужской пол в таблице"
-        />
+          <NInput
+            v-model:value="genderKeys.male.value"
+            placeholder="Значение отвечающее за мужской пол в таблице"
+          />
 
-        <NInput
-          v-model:value="genderKeys.female.value"
-          placeholder="Значение отвечающее за женский пол в таблице"
-        />
+          <NInput
+            v-model:value="genderKeys.female.value"
+            placeholder="Значение отвечающее за женский пол в таблице"
+          />
+
+          <div class="create-name-view__add-btn">
+            <NButton
+              type="primary"
+              attr-type="submit"
+            >
+              Обработать
+            </NButton>
+          </div>
+        </form>
+
+        <NDivider>Или добавьте в ручную</NDivider>
+
+        <form
+          class="create-name-view__form"
+          @submit.prevent="onCreate"
+        >
+          <NInput
+            v-model:value="nameVal"
+            placeholder="Фамилия и Имя"
+          />
+
+          <NSelect
+            v-model:value="genderVal"
+            placeholder="Пол"
+            :options="GenderOptions"
+          />
+
+          <div class="create-name-view__add-btn">
+            <NSwitch
+              v-model:value="decline"
+            >
+              <template #checked>
+                Склонять
+              </template>
+              <template #unchecked>
+                Не склонять
+              </template>
+            </NSwitch>
+
+            <NButton
+              type="primary"
+              attr-type="submit"
+            >
+              Добавить
+            </NButton>
+          </div>
+        </form>
       </div>
 
-      <div class="create-name-view__add-btn">
-        <NButton
-          type="primary"
-          attr-type="submit"
-        >
-          Обработать
-        </NButton>
-      </div>
-    </form>
+      <NScrollbar style="max-height: 410px;">
+        <NTable :single-line="false">
+          <thead>
+            <tr>
+              <th>Фамилия и Имя</th>
+              <th>Сколнение</th>
+              <th>Пол</th>
+              <th>
+                <NButton @click="setAllDeclinible">
+                  Отметить все
+                </NButton>
+              </th>
+              <th>
+                <NButton @click="saveAll">
+                  Сохранить все
+                </NButton>
+              </th>
+            </tr>
+          </thead>
 
-    <NDivider>Или добавьте в ручную</NDivider>
+          <tbody
+            v-for="(value, index) in list"
+            :key="value.id"
+          >
+            <td>
+              <NInput
+                v-model:value="value.name"
+                placeholder="Фамилия и Имя"
+              />
+            </td>
 
-    <form
-      class="create-name-view__form"
-      @submit.prevent="onCreate"
-    >
-      <NInput
-        v-model:value="nameVal"
-        placeholder="Фамилия и Имя"
-      />
+            <td>
+              <NInput
+                v-model:value="value.declension"
+                placeholder="Сколнение"
+                disabled
+              />
+            </td>
 
-      <NSelect
-        v-model:value="genderVal"
-        placeholder="Пол"
-        :options="GenderOptions"
-      />
+            <td>
+              <NSelect
+                v-model:value="value.gender"
+                placeholder="Пол"
+                :options="GenderOptions"
+              />
+            </td>
 
-      <div class="create-name-view__add-btn">
-        <NButton
-          type="primary"
-          attr-type="submit"
-        >
-          Добавить
-        </NButton>
-      </div>
-    </form>
+            <td>
+              <div>
+                <NSwitch
+                  v-model:value="value.decline"
+                >
+                  <template #checked>
+                    Склонять
+                  </template>
+                  <template #unchecked>
+                    Не склонять
+                  </template>
+                </NSwitch>
+              </div>
+            </td>
 
-    <NDivider />
-
-    <NScrollbar style="max-height: 226px;">
-      <NTable :single-line="false">
-        <thead>
-          <tr>
-            <th>Фамилия и Имя</th>
-            <th>Сколнение</th>
-            <th>Пол</th>
-            <th />
-          </tr>
-        </thead>
-
-        <tbody
-          v-for="(value, index) in list"
-          :key="value.id"
-        >
-          <td>
-            <NInput
-              v-model:value="value.name"
-              placeholder="Фамилия и Имя"
-            />
-          </td>
-
-          <td>
-            <NInput
-              v-model:value="value.declension"
-              placeholder="Сколнение"
-              disabled
-            />
-          </td>
-
-          <td>
-            <NSelect
-              v-model:value="value.gender"
-              placeholder="Пол"
-              :options="GenderOptions"
-            />
-          </td>
-
-          <td class="create-name-view__redact">
-            <div class="create-name-view__redact-btn">
-              <NButton
-                type="error"
-                @click="onRemove(index, value)"
-              >
-                <template #icon>
-                  <NIcon :component="TrashBinOutline" />
-                </template>
-              </NButton>
-              <NButton
-                type="primary"
-                @click="onRedact(index, value)"
-              >
-                <template #icon>
-                  <NIcon :component="SaveOutline" />
-                </template>
-              </NButton>
-            </div>
-          </td>
-        </tbody>
-      </NTable>
-    </NScrollbar>
+            <td class="create-name-view__redact">
+              <div class="create-name-view__redact-btn">
+                <NButton
+                  type="error"
+                  @click="onRemove(index, value)"
+                >
+                  <template #icon>
+                    <NIcon :component="TrashBinOutline" />
+                  </template>
+                </NButton>
+                <NButton
+                  type="primary"
+                  @click="onRedact(index, value)"
+                >
+                  <template #icon>
+                    <NIcon :component="SaveOutline" />
+                  </template>
+                </NButton>
+              </div>
+            </td>
+          </tbody>
+        </NTable>
+      </NScrollbar>
+    </div>
   </div>
 </template>
 

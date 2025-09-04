@@ -7,7 +7,6 @@ import type { Component } from 'vue';
 
 import { Pencil } from '@vicons/ionicons5';
 
-import { LangCode } from '@/shared/types';
 import type { CreateFileNameParam, NameOption, SubjectOption, SubjectTypeOption } from '@/shared/types';
 import type { WindowWithElectronApi } from '@/shared/types/common';
 import { useModal } from '@/composables/use_modal';
@@ -19,7 +18,6 @@ import { ActionMode, SubjectType } from './types';
 import CreateName from './components/create-name/CreateName.vue';
 import CreateSubject from './components/create-subject/CreateSubject.vue';
 import { useHotKeys } from '@/composables/use_hotkeys';
-import { transliterate } from 'transliteration';
 
 const message = useMessage();
 const nameList = useNamesListStorage();
@@ -124,16 +122,6 @@ async function onSubmitCreate() {
     });
   }
 
-  const translitMap: Record<string, Record<LangCode, string>> = pickedNames.reduce((acc, { name, declension }) => {
-    const transliterated = transliterate(name);
-    acc[name] = {
-      [LangCode.EN]: transliterated,
-      [LangCode.UZ]: transliterated,
-      [LangCode.RU]: declension,
-    };
-    return acc;
-  }, {} as Record<string, Record<LangCode, string>>);
-
   try {
     const windowEAPI = window as WindowWithElectronApi;
     let subjectTypes: SubjectTypeOption[] = [];
@@ -151,7 +139,6 @@ async function onSubmitCreate() {
       subjects: pickedSubjects,
       names: pickedNames,
       subjectTypes,
-      translitMap,
       groupNumber: 3,
       groupID: 'E',
       schoolNumber: '247',
@@ -242,6 +229,7 @@ onMounted(() => {
           v-model:value="nameValue"
           multiple
           :options="nameListOptions"
+          clearable
           placeholder="По умолчанию выбраны все"
         />
       </div>
@@ -253,6 +241,7 @@ onMounted(() => {
           multiple
           :options="subjectListOptions"
           placeholder="По умолчанию выбраны все"
+          clearable
         />
       </div>
 

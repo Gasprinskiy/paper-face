@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-import { NButton, NDivider, NIcon, NInput, NScrollbar, NSelect, NTable, useMessage } from 'naive-ui';
+import { NButton, NIcon, NInput, NScrollbar, NSelect, NTable, useMessage } from 'naive-ui';
 import { SaveOutline, TrashBinOutline } from '@vicons/ionicons5';
 import { required } from '@vuelidate/validators';
 import { computed, ref, shallowRef, toRaw } from 'vue';
 
 import { declineWord } from '@/packages/name_decl';
-import { deepClone } from '@/packages/object';
+import { deepCopyArrayOfObjects, deepCopyObject } from '@/packages/object';
 import { LangCode } from '@/shared/types';
 import type { SubjectOption } from '@/shared/types';
 import { useSubjectsListStorage } from '@/composables/storage';
@@ -20,7 +20,7 @@ const subjectsList = useSubjectsListStorage();
 
 const nameVal = shallowRef<string>('');
 const langCode = shallowRef<LangCode>(LangCode.RU);
-const list = ref<SubjectOption[]>(deepClone(toRaw(subjectsList.value)));
+const list = ref<SubjectOption[]>(deepCopyArrayOfObjects(toRaw(subjectsList.value)));
 
 const isLangCodeRu = computed<boolean>(() => langCode.value === LangCode.RU);
 
@@ -59,7 +59,7 @@ async function addName() {
     lang_code: langCode.value,
   }];
 
-  list.value = subjectsList.value;
+  list.value = deepCopyArrayOfObjects(toRaw(subjectsList.value));
 
   nameVal.value = '';
 
@@ -75,6 +75,7 @@ async function onRedact(index: number, value: SubjectOption) {
       nameDeclension = await declineWord(value.name, 'dative');
     } catch {
       message.error('Ошбика при сколнении слова, возожно вы выбрали не тот язык');
+      list.value[index] = deepCopyObject(toRaw(subjectsList.value[index]));
       return;
     }
   }
@@ -86,7 +87,7 @@ async function onRedact(index: number, value: SubjectOption) {
     lang_code: value.lang_code,
   };
 
-  list.value[index] = subjectsList.value[index];
+  list.value[index] = deepCopyObject(toRaw(subjectsList.value[index]));
 
   message.success('Изменения сохранены');
 }
@@ -105,92 +106,92 @@ function onRemove(removeIndex: number, removeValue: SubjectOption) {
   <div class="create-subject-view">
     <h2>{{ ActionNames[ActionMode.SUBJECTS] }}</h2>
 
-    <form
-      class="create-subject-view__form"
-      @submit.prevent="addName"
-    >
-      <NInput
-        v-model:value="nameVal"
-        placeholder="Название предмета"
-      />
+    <div class="create-subject-view__body">
+      <form
+        class="create-subject-view__form"
+        @submit.prevent="addName"
+      >
+        <NInput
+          v-model:value="nameVal"
+          placeholder="Название предмета"
+        />
 
-      <NSelect
-        v-model:value="langCode"
-        :options="LangOptions"
-        placeholder="Язык"
-      />
+        <NSelect
+          v-model:value="langCode"
+          :options="LangOptions"
+          placeholder="Язык"
+        />
 
-      <div class="create-subject-view__add-btn">
-        <NButton
-          type="primary"
-          attr-type="submit"
-        >
-          Добавить
-        </NButton>
-      </div>
-    </form>
+        <div class="create-subject-view__add-btn">
+          <NButton
+            type="primary"
+            attr-type="submit"
+          >
+            Добавить
+          </NButton>
+        </div>
+      </form>
 
-    <NDivider />
+      <NScrollbar style="max-height: 450px;">
+        <NTable :single-line="false">
+          <thead>
+            <tr>
+              <th>Название предмета</th>
+              <th>Сколнение</th>
+              <th>Язык</th>
+              <th />
+            </tr>
+          </thead>
 
-    <NScrollbar style="max-height: 226px;">
-      <NTable :single-line="false">
-        <thead>
-          <tr>
-            <th>Название предмета</th>
-            <th>Сколнение</th>
-            <th>Язык</th>
-            <th />
-          </tr>
-        </thead>
+          <tbody
+            v-for="(value, index) in list"
+            :key="index"
+          >
+            <td>
+              <NInput
+                v-model:value="value.name"
+                placeholder="Название предмета"
+              />
+            </td>
 
-        <tbody
-          v-for="(value, index) in list"
-          :key="index"
-        >
-          <td>
-            <NInput
-              v-model:value="value.name"
-              placeholder="Название предмета"
-            />
-          </td>
+            <td>
+              <NInput
+                v-model:value="value.declension"
+                placeholder="Склонение"
+                disabled
+              />
+            </td>
 
-          <td>
-            <NInput
-              v-model:value="value.declension"
-              placeholder="Склонение"
-              disabled
-            />
-          </td>
+            <td>
+              <NSelect
+                v-model:value="value.lang_code"
+                :options="LangOptions"
+                placeholder="Язык"
+              />
+            </td>
 
-          <td>
-            <NSelect
-              v-model:value="value.lang_code"
-              :options="LangOptions"
-              placeholder="Язык"
-            />
-          </td>
-
-          <td class="create-subject-view__redact-btn">
-            <NButton
-              type="error"
-              @click="onRemove(index, value)"
-            >
-              <template #icon>
-                <NIcon :component="TrashBinOutline" />
-              </template>
-            </NButton>
-            <NButton
-              type="primary"
-              @click="onRedact(index, value)"
-            >
-              <template #icon>
-                <NIcon :component="SaveOutline" />
-              </template>
-            </NButton>
-          </td>
-        </tbody>
-      </NTable>
-    </NScrollbar>
+            <td class="create-subject-view__redact-btn">
+              <NButton
+                type="error"
+                @click="onRemove(index, value)"
+              >
+                <template #icon>
+                  <NIcon :component="TrashBinOutline" />
+                </template>
+              </NButton>
+              <NButton
+                type="primary"
+                @click="onRedact(index, value)"
+              >
+                <template #icon>
+                  <NIcon :component="SaveOutline" />
+                </template>
+              </NButton>
+            </td>
+          </tbody>
+        </NTable>
+      </NScrollbar>
+    </div>
   </div>
 </template>
 

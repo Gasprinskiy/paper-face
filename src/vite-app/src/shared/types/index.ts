@@ -20,6 +20,7 @@ export interface CommonOptionWithID extends CommonOption {
 
 export interface NameOption extends CommonOptionWithID {
   gender: Gender;
+  decline?: boolean;
 }
 
 export interface SubjectOption extends CommonOptionWithID {

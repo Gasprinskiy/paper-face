@@ -1,12 +1,24 @@
 .create-name-view {
   display: flex;
   flex-direction: column;
+  width: 100%;
   gap: 25px;
 
   &__skeleton {
     position: absolute;
     width: 100%;
     height: 100%;
+  }
+
+  &__body {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    height: 100%;
+
+    &-left {
+      width: 60%;
+    }
   }
 
   &__form {
@@ -57,6 +69,8 @@
   &__add-btn {
     width: 100%;
     display: flex;
+    align-items: center;
     justify-content: right;
+    gap: 10px;
   }
 }
